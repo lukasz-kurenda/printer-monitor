@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="author" content="Łukasz Kurenda">
+    <meta name="copyright" content="Urząd Zamówień Publicznych">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Drukarek</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --header-color: #343a40;
+            --border-color: #dee2e6;
+            --shadow: 0 4px 8px rgba(0,0,0,0.05);
+            --btn-primary: #007bff;
+            --btn-primary-hover: #0056b3;
+            --btn-secondary: #6c757d;
+            --btn-secondary-hover: #5a6268;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+        }
+        .container {
+            max-width: 1600px;
+            margin: auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            color: var(--header-color);
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            color: #6c757d;
+            margin-top: 0;
+        }
+        .controls {
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .btn {
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+        .btn-primary { background-color: var(--btn-primary); }
+        .btn-primary:hover { background-color: var(--btn-primary-hover); }
+        .btn-secondary { background-color: var(--btn-secondary); }
+        .btn-secondary:hover { background-color: var(--btn-secondary-hover); }
+        .btn:disabled { background-color: #a0a6ac; cursor: not-allowed; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-header {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-header h3 { margin: 0; font-size: 1.1rem; }
+        .card-header .location { font-size: 0.9rem; color: #6c757d; }
+        .card-body { padding: 15px; flex-grow: 1; }
+        .toner-item { margin-bottom: 12px; }
+        .toner-item:last-child { margin-bottom: 0; }
+        .toner-desc {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            height: 22px;
+            position: relative;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            transition: width 0.3s ease;
+        }
+        .toner-item .icon { font-size: 1.1rem; margin-right: 8px; font-weight: bold; }
+        .icon.warning { color: #f0ad4e; }
+        .icon.critical { color: #d9534f; }
+        .progress-wrapper { display: flex; align-items: center; flex-grow: 1; }
+        .progress-label-outside { padding-left: 8px; font-size: 12px; font-weight: bold; }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .notification.show { opacity: 1; }
+        .card-footer {
+            padding: 10px 15px;
+            background-color: #f8f9fa;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            color: #6c757d;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #95a5a6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Stan tonerów w drukarkach w Urzędzie Zamówień Publicznych</h1>
+            <p>Dane aktualizowane są automatycznie co 8 godzin (0:00, 8:00, 16:00)</p>
+        </div>
+        
+        <div class="controls">
+            <button id="updateBtn" class="btn btn-secondary">Aktualizuj stan tonerów w drukarkach</button>
+            <button id="reportBtn" class="btn btn-primary">Generuj raport liczników z drukarek</button>
+        </div>
+
+        <div class="grid">
+            {% for printer in printers %}
+            <div class="card">
+                <div class="card-header">
+                    <h3>{{ printer.name }}</h3>
+                    <span class="location">Lokalizacja: {{ printer.location or 'Brak' }} | IP: {{ printer.ip }}</span>
+                </div>
+                <div class="card-body">
+                    {% for toner in printer.toners %}
+                    <div class="toner-item">
+                        <div class="toner-desc">
+                            {% if toner.level is not none and toner.level <= 1 %}
+                                <span class="icon critical" title="Poziom krytyczny!">&#9888;</span>
+                            {% elif toner.level is not none and toner.level <= 5 %}
+                                <span class="icon warning" title="Niski poziom">&#9888;</span>
+                            {% endif %}
+                            {{ toner.desc.split(' S/N:')[0] }}
+                        </div>
+                        <div class="progress-wrapper">
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: {{ toner.level }}%; background-color: {{ toner.bg_color }}; color: {{ toner.text_color }};">
+                                    {% if toner.level > 10 %}
+                                        {{ "%.0f"|format(toner.level) }}%
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if toner.level <= 10 %}
+                                <span class="progress-label-outside">{{ "%.0f"|format(toner.level) }}%</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                        <p style="text-align: center; color: #6c757d;">Brak danych. Oczekiwanie na dane...</p>
+                    {% endfor %}
+                </div>
+                <div class="card-footer">
+                    Ostatnia aktualizacja: {{ printer.last_updated }}
+                </div>
+            </div>
+            {% else %}
+                <p style="text-align: center; grid-column: 1 / -1;">Brak drukarek w pliku printers.csv</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+    
+    <footer class="footer">
+        <p>Dashboard monitoringu drukarek w UZP</p>
+        <p>Copyright &copy; 2025 Urząd Zamówień Publicznych</p>
+        <p>Stworzone przez: Łukasz Kurenda</p> 
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const updateBtn = document.getElementById('updateBtn');
+            const reportBtn = document.getElementById('reportBtn');
+            const notification = document.getElementById('notification');
+
+            updateBtn.addEventListener('click', () => {
+                triggerScript('/run-check-toner', updateBtn, 'Aktualizowanie...');
+            });
+
+            reportBtn.addEventListener('click', () => {
+                triggerScript('/run-report-counters', reportBtn, 'Generowanie...');
+            });
+
+            function triggerScript(endpoint, button, loadingText) {
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.textContent = loadingText;
+
+                fetch(endpoint, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        showNotification(data.message, data.status === 'error');
+                        if (endpoint === '/run-check-toner' && data.status === 'success') {
+                            setTimeout(() => { window.location.reload(); }, 2000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification('Wystapil blad polaczenia z serwerem.', true);
+                    })
+                    .finally(() => {
+                        setTimeout(() => {
+                            button.disabled = false;
+                            button.textContent = originalText;
+                        }, 3000);
+                    });
+            }
+
+            function showNotification(message, isError = false) {
+                notification.textContent = message;
+                notification.style.backgroundColor = isError ? '#dc3545' : '#28a745';
+                notification.classList.add('show');
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>
+

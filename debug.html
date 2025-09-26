@@ -1,0 +1,85 @@
+<html>
+<meta http-equiv="X-UA-Compatible" content="IE=7">
+<META http-equiv=Content-Type content="text/html; charset=windows-1252">
+<head>
+<META HTTP-EQUIV="cache-Control: private" CONTENT="NO-CACHE">
+<META HTTP-EQUIV="PRAGMA" CONTENT="NO-CACHE">
+    <META HTTP-EQUIV="Expires" CONTENT="1">
+    <link rel="stylesheet" type="text/css" href="styles/style.css?v=1572699244ta">
+    <!--<title class="clsTitle1">TopAccess</title>-->
+    <script language="javascript" type="text/javascript" src="/js/Cookies.js?v=1572699244ta"></script>
+    <script language="javascript" type="text/javascript" src="/localization/Locale_languages_installed.js?v=1572699244ta"></script>
+    <script language="javascript" type="text/javascript" src="/js/localization.js?v=1572699244ta"></script>
+    <SCRIPT language="javascript" type="text/javascript" src="/js/AjaxReqRespHandler.js?v=1572699244ta"></SCRIPT>
+    <script language="javascript" type="text/javascript">
+    var gblTopWindow;
+    if(location.href.indexOf("?MAIN=EFILING") == -1){
+        window.opener = null;
+        gblTopWindow=true;
+    }
+    </script>
+    <SCRIPT language="javascript" type="text/javascript" src="/js/TopAccessUtil.js?v=1572699244ta"></SCRIPT>
+    <script language="javascript" type="text/javascript">
+    var gblTAUrl = window.location.protocol+"//"+((window.location.hostname.indexOf(":") != -1 && window.location.hostname.indexOf("]") == -1)?(("["+window.location.hostname+"]")+((window.location.port != "")? ":"+window.location.port : "" )) : window.location.host);
+    var gblLocaleOrder;
+    var gblDeviceModelId = "";            
+    var gblHDDInstallation = ""; 
+    var gblStorageType = "";           
+    var gblTALocaleDirectory = fnGetResolveLocaleForDisplay();
+    document.write("<SCRIPT language='javascript' type='text/javascript' src='"+gblTAUrl+"/localization/"+gblTALocaleDirectory+"/locale_TopAccess_Messages.js?v=1572699244ta'><\/script>");
+</script>
+<script type="text/javascript">
+    var arrDocumentPageObj=null;
+    //var arrTempGroupListObj=null;
+    var gblTopDisplayFilter = "renderOnlyExplorer";
+    var trackOpenedBox="";
+    var trackOpenedFolder="";
+    var trackClosedBox="";
+    var trackClosedFolder="";
+    var appendUrlRequired=false;
+    var PBarWindow =null;
+    function createArray(length){
+        return new Array(length)
+    }
+
+    var eFilingTitle = fnGetLocaleString("100597","e-Filing");    
+    document.write('<title class="clsTitle1">'+((location.href.indexOf("?MAIN=EFILING") == -1) ? "TopAccess" : eFilingTitle )+'</title>');
+    fnSetClientCookie("BrowserLang",gblTALocaleDirectory);
+</script>
+
+<!-- TopAccess for iOS 2013/3/15 A.Terabe -->
+<script type="text/javascript">
+    if ((navigator.userAgent.indexOf('iPhone') > 0) || (navigator.userAgent.indexOf('iPad') > 0) || (navigator.userAgent.indexOf('iPod') > 0)) {
+        
+        var enableIOS = top.fnGetCookie("enableIOS");
+        if(enableIOS == ""){
+            gblSETRequestXMLArray = ["<DiagnosticMode><Category><Mode>08</Mode><MainCode><Code>8832</Code></MainCode></Category></DiagnosticMode>"];
+            glbContentWebServerCmdArray = ["<GetDiagnosticMode><commandNode>DiagnosticMode</commandNode></GetDiagnosticMode>"];
+            gblGETRequestXMLArray = ["<DiagnosticMode></DiagnosticMode>"];
+            gblBoolHandleRespArray = [false];
+            gblHashMapArray = [null];
+            calledFromPage = "GetDiagnosticSettings";
+            gblAsync = false;
+            InitiateServerRequest("SETCMDGET");
+            gblAsync = true;
+            var docObj = ajaxObj.responseXML;
+            if(docObj === null || docObj === undefined){
+                enableIOS = 0;
+            }else{
+                enableIOS = getXpathValue(docObj, "DiagnosticMode/Category/MainCode/ValueList/Value/Value");
+            }
+            top.fnSetCookie("enableIOS", enableIOS);
+        }
+        if(enableIOS == "1"){
+            location.href = './AirPrint/airprint_index.html?v=1572699244ta';
+        }
+    }
+</script>
+<!-- TopAccess for iOS 2013/3/15 A.Terabe -->
+
+<noscript><span id="noscript">Javascript is disabled in your browser.Please enable it to view TopAccess</span></noscript>
+</head>
+<frameset name="TATopLevelFrameSet" ROWS="*" framespacing="0" frameborder="0" border="0" width="100%" framespacing="0">
+        <frame name="TopLevelFrame" SRC='FrameIndex.html?v=1572699244ta' width="100%" marginheight="0" marginwidth="0" frameborder="0" border="0" scrolling="no" title="TopAccess">
+</frameset>
+</html>
