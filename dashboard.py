@@ -8,6 +8,7 @@ import os
 import configparser
 import subprocess
 import csv
+import sys
 
 # --- Konfiguracja ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,6 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 DB_FILE = os.path.join(BASE_DIR, 'printers.db')
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.ini')
 PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.csv')
+LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
 app = Flask(__name__)
 
 # --- Funkcje pomocnicze ---
@@ -70,18 +72,18 @@ def get_toner_color(description):
         return {'bg': '#fff200', 'text': '#000000'}
     return {'bg': '#6c757d', 'text': '#ffffff'}
 
-def run_background_script(command, log_file):
-    """Uruchamia podane polecenie w tle i loguje jego wyjscie."""
-    logging.info(f"Otrzymano zadanie uruchomienia polecenia: {command}")
+def run_background_script(command_list, log_file):
+    """Uruchamia podane polecenie w tle w bezpieczny sposób (bez shell=True)."""
+    logging.info(f"Otrzymano zadanie uruchomienia polecenia: {' '.join(command_list)}")
     try:
         with open(log_file, "a") as log:
-            subprocess.Popen(command, shell=True, stdout=log, stderr=subprocess.STDOUT)
+            subprocess.Popen(command_list, stdout=log, stderr=subprocess.STDOUT)
         
         logging.info("Polecenie zostalo uruchomione w tle.")
-        return True, "Zlecono zadanie. Wynik pojawi sie po zakonczeniu."
+        return True, "Zlecono zadanie. Wynik pojawi się po zakończeniu."
     except Exception as e:
-        logging.error(f"Nie udalo sie uruchomic procesu: {e}")
-        return False, f"Wystapil blad serwera: {e}"
+        logging.error(f"Nie udało się uruchomić procesu: {e}")
+        return False, f"Wystąpił błąd serwera: {e}"
 
 # --- Głowne widoki aplikacji ---
 # ZNAJDŹ I ZAKTUALIZUJ FUNKCJĘ index()
@@ -157,23 +159,57 @@ def index():
 
 @app.route('/run-report-counters', methods=['POST'])
 def run_report_counters():
-    command = "/home/admin/printer-monitor/venv/bin/python3 /home/admin/printer-monitor/main.py --report-counters --force-counters-email"
-    log_file = "/home/admin/printer-monitor/cron.log"
-    success, message = run_background_script(command, log_file)
-    if success:
-        return jsonify({'status': 'success', 'message': 'Zlecono generowanie raportu. E-mail zostanie wyslany po zakonczeniu.'})
-    else:
-        return jsonify({'status': 'error', 'message': message}), 500
+    """Uruchamia w tle skrypt generujacy raport licznikow, z mechanizmem blokady."""
+    if os.path.exists(LOCK_FILE):
+        return jsonify({'status': 'error', 'message': 'Inny proces jest już uruchomiony. Spróbuj ponownie za chwilę.'}), 409
+
+    try:
+        with open(LOCK_FILE, 'w') as f:
+            f.write(str(datetime.now()))
+
+        python_executable = sys.executable
+        main_script_path = os.path.join(BASE_DIR, 'main.py')
+        log_file = os.path.join(BASE_DIR, 'cron.log')
+        command_list = [python_executable, main_script_path, '--report-counters', '--force-counters-email']
         
+        success, message = run_background_script(command_list, log_file)
+        if success:
+            return jsonify({'status': 'success', 'message': 'Zlecono generowanie raportu. E-mail zostanie wysłany po zakończeniu.'})
+        else:
+            os.remove(LOCK_FILE)
+            return jsonify({'status': 'error', 'message': message}), 500
+    except Exception as e:
+        logging.error(f"Blad podczas tworzenia blokady lub uruchamiania skryptu: {e}")
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+        return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
+
 @app.route('/run-check-toner', methods=['POST'])
 def run_check_toner():
-    command = "/home/admin/printer-monitor/venv/bin/python3 /home/admin/printer-monitor/main.py --check-toner --force-toner-email"
-    log_file = "/home/admin/printer-monitor/cron.log"
-    success, message = run_background_script(command, log_file)
-    if success:
-        return jsonify({'status': 'success', 'message': 'Zlecono aktualizacje stanow tonerow. Odswiez strone za chwile.'})
-    else:
-        return jsonify({'status': 'error', 'message': message}), 500
+    """Uruchamia w tle skrypt sprawdzajacy stan tonerow, z mechanizmem blokady."""
+    if os.path.exists(LOCK_FILE):
+        return jsonify({'status': 'error', 'message': 'Inny proces jest już uruchomiony. Spróbuj ponownie za chwilę.'}), 409
+
+    try:
+        with open(LOCK_FILE, 'w') as f:
+            f.write(str(datetime.now()))
+
+        python_executable = sys.executable
+        main_script_path = os.path.join(BASE_DIR, 'main.py')
+        log_file = os.path.join(BASE_DIR, 'cron.log')
+        command_list = [python_executable, main_script_path, '--check-toner', '--force-toner-email']
+
+        success, message = run_background_script(command_list, log_file)
+        if success:
+            return jsonify({'status': 'success', 'message': 'Zlecono aktualizację stanów tonerów. Odśwież stronę za chwilę.'})
+        else:
+            os.remove(LOCK_FILE)
+            return jsonify({'status': 'error', 'message': message}), 500
+    except Exception as e:
+        logging.error(f"Blad podczas tworzenia blokady lub uruchamiania skryptu: {e}")
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+        return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
 
 if __name__ == '__main__':
     if not os.path.exists(DB_FILE):
