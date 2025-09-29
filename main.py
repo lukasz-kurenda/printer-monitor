@@ -538,8 +538,43 @@ def init_selenium_driver(config):
         logging.error(f"Nie udalo sie zainicjalizowac sterownika Selenium: {e}")
         return None
 
+
+async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
+    """
+    Odczytuje liczniki stron przez SNMP.
+    Jeśli zdefiniowano niestandardowe OID-y dla liczników, używa ich.
+    W przeciwnym razie, używa ogólnego OID-a dla sumy stron jako fallback.
+    """
+    if custom_oids and custom_oids.get('oid_color_count') and custom_oids.get('oid_bw_count'):
+        logging.info(f"[{ip}] Używam niestandardowych OID-ów do odczytu liczników stron.")
+        color_oid = custom_oids.get('oid_color_count')
+        bw_oid = custom_oids.get('oid_bw_count')
+        oids_to_fetch = [color_oid, bw_oid]
+
+        data = await get_snmp_data_async(ip, oids_to_fetch, community)
+
+        color_count_str = data.get(color_oid)
+        bw_count_str = data.get(bw_oid)
+
+        try:
+            color_count = int(color_count_str) if color_count_str is not None else 0
+            bw_count = int(bw_count_str) if bw_count_str is not None else 0
+            total_count = color_count + bw_count
+
+            if color_count_str is None and bw_count_str is None:
+                 logging.warning(f"[{ip}] Niestandardowe OID-y liczników nie zwróciły żadnych wartości.")
+                 return None
+
+            return {'color': color_count, 'bw': bw_count, 'sum': total_count, 'status': 'OK'}
+        except (ValueError, TypeError) as e:
+            logging.warning(f"[{ip}] Nie udało się przetworzyć niestandardowych wartości liczników SNMP. Sprawdź OID-y. Błąd: {e}")
+            return None
+
+    # Fallback to a generic total counter if custom OIDs are not provided or incomplete
+
 async def get_counters_snmp(ip, community, model_name=""):
     """Ogolna funkcja do odczytu calkowitej liczby stron przez SNMP (Fallback)."""
+
     logging.info(f"[{ip}] Uzywam ogolnej metody SNMP do odczytu sumy licznikow (Fallback).")
     total_oid = '1.3.6.1.2.1.43.10.2.1.4.1.1'
     total_data = await get_snmp_data_async(ip, [total_oid], community)
@@ -547,20 +582,23 @@ async def get_counters_snmp(ip, community, model_name=""):
     if total_count:
         try:
             total = int(total_count)
+            # Assume total is black & white if color is not specified
             return {'color': 0, 'bw': total, 'sum': total, 'status': 'OK'}
         except (ValueError, TypeError):
             logging.warning(f"[{ip}] Nie udalo sie przetworzyc sumy licznika SNMP.")
     return None
 
 def get_web_data_with_selenium(driver, ip_address):
-    """Probuje pobrac dane przez HTTP (sprawdzona metoda dla Toshib)."""
+    """Pobiera dane przez HTTP, używając WebDriverWait dla większej stabilności."""
     try:
-        logging.info(f"[{ip_address}] Rozpoczynam probe web scrapingu przez HTTP...")
+        logging.info(f"[{ip_address}] Rozpoczynam próbę web scrapingu przez HTTP...")
         web_data = {'status': 'OK'}
-        driver.set_page_load_timeout(30)
+        wait = WebDriverWait(driver, 25)
 
+        # Pobierz informacje o urządzeniu
         driver.get(f"http://{ip_address}/?MAIN=DEVICE")
-        time.sleep(2); driver.switch_to.frame("TopLevelFrame"); time.sleep(1); driver.switch_to.frame("contents"); time.sleep(1)
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         name_tag = soup.find(id='DeviceName')
@@ -569,8 +607,10 @@ def get_web_data_with_selenium(driver, ip_address):
         if location_tag: web_data['location'] = location_tag.get_text(strip=True)
         driver.switch_to.default_content()
 
+        # Pobierz informacje o licznikach
         driver.get(f"http://{ip_address}/?MAIN=COUNTER&SUB=TOTAL")
-        time.sleep(2); driver.switch_to.frame("TopLevelFrame"); time.sleep(1); driver.switch_to.frame("contents"); time.sleep(1)
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         color_cell = soup.find('td', id='TotalFullColor')
@@ -580,18 +620,18 @@ def get_web_data_with_selenium(driver, ip_address):
         driver.switch_to.default_content()
 
         if web_data.get('color') is None or web_data.get('bw') is None:
-             logging.warning(f"[{ip_address}] Polaczono, ale nie znaleziono elementow licznika na stronie.")
+             logging.warning(f"[{ip_address}] Połączono, ale nie znaleziono elementów licznika na stronie.")
              return None
         
-        logging.info(f"[{ip_address}] Web scraping zakonczony sukcesem.")
+        logging.info(f"[{ip_address}] Web scraping zakończony sukcesem.")
         return web_data
 
     except (TimeoutException, WebDriverException) as e:
-        logging.warning(f"[{ip_address}] Web scraping nie powiodl sie: {type(e).__name__}")
+        logging.warning(f"[{ip_address}] Web scraping nie powiódł się: {type(e).__name__}")
         driver.switch_to.default_content()
         return 'offline'
     except Exception as e:
-        logging.error(f"[{ip_address}] Niespodziewany blad podczas web scrapingu: {e}", exc_info=True)
+        logging.error(f"[{ip_address}] Niespodziewany błąd podczas web scrapingu: {e}", exc_info=True)
         driver.switch_to.default_content()
         return None
 
@@ -672,7 +712,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'))
+                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'), custom_oids)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 elif web_data == 'offline':
@@ -748,6 +788,7 @@ async def report_counters(force_email=False, ip_to_test=None):
             counter_data_row = {'ip': ip, **base_info}
             
             # Proba odczytu na żywo
+            custom_oids = get_custom_oids_for_ip(config, ip)
             web_data = get_web_data_with_selenium(driver, ip)
             
             if web_data and web_data != 'offline':
@@ -756,7 +797,7 @@ async def report_counters(force_email=False, ip_to_test=None):
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'))
+                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'), custom_oids)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 else:
