@@ -137,6 +137,7 @@ Plik `config.ini` jest podzielony na kilka sekcji:
     *   `chrome_binary`: Ścieżka do pliku wykonywalnego przeglądarki Chrome/Chromium (np. `/usr/bin/chromium-browser`).
     *   `headless`: `true`, jeśli przeglądarka ma działać w tle.
 
+
 *   **`[CUSTOM_OIDS:adres_ip]`**: (Opcjonalne) Definicja niestandardowych OID-ów SNMP dla konkretnej drukarki. Użyj tej sekcji, jeśli standardowe OIDy nie działają dla danego modelu. W tej sekcji można zdefiniować OID-y zarówno dla tonerów, jak i dla liczników stron.
     *   `oid_desc`, `oid_max`, `oid_current`: OID-y dla opisu, wartości maksymalnej i bieżącej tonerów.
     *   `oid_color_count`, `oid_bw_count`: OID-y dla liczników stron kolorowych i czarno-białych.
@@ -159,6 +160,8 @@ Jeśli domyślne metody odczytu danych zawodzą (szczególnie w przypadku liczni
 3.  **Przeanalizuj plik `snmp_output.txt`**: Szukaj w nim słów kluczowych, takich jak `count`, `counter`, `page`, `impression`, `black`, `color`. OID-y liczników często zawierają w opisie te słowa. Gdy znajdziesz obiecujące linie, skopiuj numeryczny OID i wklej go do odpowiedniego pola w `config.ini`.
 
     *Przykład:* Jeśli znajdziesz OID `.1.3.6.1.4.1.XXXX.XX.1.2.3` z opisem "Total Color Pages", wklej ten numer jako wartość `oid_color_count`.
+=======
+*   **`[CUSTOM_OIDS:adres_ip]`**: (Opcjonalne) Definicja niestandardowych OID-ów SNMP dla konkretnej drukarki. Użyj tej sekcji, jeśli standardowe OIDy nie działają dla danego modelu.
 
 ### Pliki z listą drukarek
 

@@ -538,6 +538,7 @@ def init_selenium_driver(config):
         logging.error(f"Nie udalo sie zainicjalizowac sterownika Selenium: {e}")
         return None
 
+
 async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
     """
     Odczytuje liczniki stron przez SNMP.
@@ -570,6 +571,10 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
             return None
 
     # Fallback to a generic total counter if custom OIDs are not provided or incomplete
+
+async def get_counters_snmp(ip, community, model_name=""):
+    """Ogolna funkcja do odczytu calkowitej liczby stron przez SNMP (Fallback)."""
+
     logging.info(f"[{ip}] Uzywam ogolnej metody SNMP do odczytu sumy licznikow (Fallback).")
     total_oid = '1.3.6.1.2.1.43.10.2.1.4.1.1'
     total_data = await get_snmp_data_async(ip, [total_oid], community)
