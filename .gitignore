@@ -1,0 +1,32 @@
+# Pliki konfiguracyjne i klucze
+secret.key
+config.ini
+
+# Baza danych
+printers.db
+*.db
+
+# Logi
+*.log
+
+# Pliki generowane przez Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Środowisko wirtualne
+venv/
+.venv/
+
+# Pliki generowane przez edytory
+.idea/
+.vscode/
+
+# Raporty
+*.xlsx
+*.html
+debug.html
+
+# Pliki systemowe
+.DS_Store

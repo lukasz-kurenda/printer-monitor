@@ -1,0 +1,10 @@
+# Główne zależności
+Flask
+pysnmp
+selenium
+cryptography
+beautifulsoup4
+
+# Zależności do raportów Excel
+pandas
+openpyxl

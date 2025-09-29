@@ -430,67 +430,146 @@ async def walk_snmp_oid(ip, community, oid):
     return results
 
 async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
+    """
+    Pobiera poziomy tonerów dla drukarki, optymalizując liczbę zapytań SNMP.
+    1. Odkrywa wszystkie materiały eksploatacyjne za pomocą SNMP walk.
+    2. Zbiera OIDy dla poziomu bieżącego i maksymalnego wszystkich materiałów.
+    3. Wysyła jedno zbiorcze zapytanie SNMP get, aby pobrać wszystkie dane naraz.
+    4. Przetwarza wyniki i zwraca listę tonerów z ich poziomami.
+    """
     toners = []
     oid_map = custom_oids if custom_oids and custom_oids.get('desc') else {
-        'desc': '1.3.6.1.2.1.43.11.1.1.6', 
-        'max': '1.3.6.1.2.1.43.11.1.1.8', 
+        'desc': '1.3.6.1.2.1.43.11.1.1.6',
+        'max': '1.3.6.1.2.1.43.11.1.1.8',
         'current': '1.3.6.1.2.1.43.11.1.1.9',
         'value_is_percentage': 'false'
     }
     low_status_percent = config.getint('MONITORING', 'toner_low_status_percent', fallback=3)
-
     base_desc_oid = oid_map.get('desc')
-    if not base_desc_oid: return []
+    if not base_desc_oid:
+        return []
 
+    # 1. Odkryj materiały przez SNMP walk
     discovered_supplies = await walk_snmp_oid(ip, community, base_desc_oid)
     if not discovered_supplies:
         logging.warning(f"[{ip}] Nie znaleziono materialow przez 'walk' dla OID: {base_desc_oid}")
         return []
 
+    # 2. Przygotuj listy OIDów do zbiorczego zapytania
+    oids_to_fetch = []
+    supply_details = {}
+    value_is_percentage = oid_map.get('value_is_percentage', 'false').lower() == 'true'
+
     for index, desc in discovered_supplies.items():
-        await asyncio.sleep(0.05) 
+        current_oid = f"{oid_map.get('current')}.{index}"
+        oids_to_fetch.append(current_oid)
+
+        max_oid = None
+        if not value_is_percentage:
+            max_oid = f"{oid_map.get('max')}.{index}"
+            oids_to_fetch.append(max_oid)
+
+        supply_details[index] = {'desc': desc, 'current_oid': current_oid, 'max_oid': max_oid}
+
+    # 3. Wyślij jedno zbiorcze zapytanie SNMP
+    logging.info(f"[{ip}] Odpytuje o {len(oids_to_fetch)} OIDow dla {len(discovered_supplies)} materialow...")
+    all_levels_data = await get_snmp_data_async(ip, oids_to_fetch, community)
+
+    # 4. Przetwórz otrzymane dane
+    for index, details in supply_details.items():
         try:
-            current_oid = f"{oid_map.get('current')}.{index}"
-            current_data = await get_snmp_data_async(ip, [current_oid], community)
-            current_level_str = current_data.get(current_oid)
+            desc = details['desc']
+            current_oid = details['current_oid']
+            current_level_str = all_levels_data.get(current_oid)
 
             if current_level_str is None or current_level_str == '':
                 logging.warning(f"[{ip}] Otrzymano pusta wartosc dla '{desc}'. Pomijam.")
                 continue
-                
+
             current_level = int(current_level_str)
             toner_data = {'desc': desc, 'raw_current': current_level, 'status': 'normal'}
-            
-            value_is_percentage = oid_map.get('value_is_percentage', 'false').lower() == 'true'
 
             if value_is_percentage:
                 toner_data.update({'level': float(current_level), 'raw_max': 100})
             else:
-                max_oid = f"{oid_map.get('max')}.{index}"
-                max_data = await get_snmp_data_async(ip, [max_oid], community)
-                max_level_str = max_data.get(max_oid)
-                
-                if max_level_str is None or max_level_str == '': continue
+                max_oid = details['max_oid']
+                max_level_str = all_levels_data.get(max_oid)
+
+                if max_level_str is None or max_level_str == '':
+                    continue
                 max_level = int(max_level_str)
                 toner_data['raw_max'] = max_level
-                
+
                 if current_level == -3:
                     toner_data.update({'level': float(low_status_percent), 'status': 'low'})
                 elif max_level == -2:
                     toner_data.update({'level': 100.0, 'status': 'new'})
                 elif max_level > 0 and current_level >= 0:
                     toner_data['level'] = min((current_level / max_level) * 100, 100.0)
-                else: continue
-            
+                else:
+                    continue  # Pomiń, jeśli dane są nieprawidłowe
+
             toners.append(toner_data)
         except (ValueError, TypeError, ZeroDivisionError) as e:
-            logging.warning(f"[{ip}] Nie mozna przetworzyc danych dla '{desc}'. Blad: {e}")
+            logging.warning(f"[{ip}] Nie mozna przetworzyc danych dla '{details['desc']}'. Blad: {e}")
             continue
+
+    logging.info(f"[{ip}] Przetworzono dane dla {len(toners)} tonerow.")
     return toners
 
 # --- FUNKCJE DLA LICZNIKOW ---
-async def get_counters_snmp(ip, community, model_name=""):
-    """Ogolna funkcja do odczytu calkowitej liczby stron przez SNMP (Fallback)."""
+
+def init_selenium_driver(config):
+    """Inicjalizuje i zwraca instancje sterownika Selenium Chrome."""
+    try:
+        logging.info("Inicjalizacja sterownika Selenium...")
+        chrome_options = Options()
+        chrome_options.binary_location = config['WWW']['chrome_binary']
+        if config['WWW'].getboolean('headless', fallback=True):
+            chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument('--blink-settings=imagesEnabled=false')
+        chrome_options.set_capability('acceptInsecureCerts', True)
+        driver = webdriver.Chrome(options=chrome_options)
+        logging.info("Sterownik Selenium zostal uruchomiony.")
+        return driver
+    except Exception as e:
+        logging.error(f"Nie udalo sie zainicjalizowac sterownika Selenium: {e}")
+        return None
+
+async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
+    """
+    Odczytuje liczniki stron przez SNMP.
+    Jeśli zdefiniowano niestandardowe OID-y dla liczników, używa ich.
+    W przeciwnym razie, używa ogólnego OID-a dla sumy stron jako fallback.
+    """
+    if custom_oids and custom_oids.get('oid_color_count') and custom_oids.get('oid_bw_count'):
+        logging.info(f"[{ip}] Używam niestandardowych OID-ów do odczytu liczników stron.")
+        color_oid = custom_oids.get('oid_color_count')
+        bw_oid = custom_oids.get('oid_bw_count')
+        oids_to_fetch = [color_oid, bw_oid]
+
+        data = await get_snmp_data_async(ip, oids_to_fetch, community)
+
+        color_count_str = data.get(color_oid)
+        bw_count_str = data.get(bw_oid)
+
+        try:
+            color_count = int(color_count_str) if color_count_str is not None else 0
+            bw_count = int(bw_count_str) if bw_count_str is not None else 0
+            total_count = color_count + bw_count
+
+            if color_count_str is None and bw_count_str is None:
+                 logging.warning(f"[{ip}] Niestandardowe OID-y liczników nie zwróciły żadnych wartości.")
+                 return None
+
+            return {'color': color_count, 'bw': bw_count, 'sum': total_count, 'status': 'OK'}
+        except (ValueError, TypeError) as e:
+            logging.warning(f"[{ip}] Nie udało się przetworzyć niestandardowych wartości liczników SNMP. Sprawdź OID-y. Błąd: {e}")
+            return None
+
+    # Fallback to a generic total counter if custom OIDs are not provided or incomplete
     logging.info(f"[{ip}] Uzywam ogolnej metody SNMP do odczytu sumy licznikow (Fallback).")
     total_oid = '1.3.6.1.2.1.43.10.2.1.4.1.1'
     total_data = await get_snmp_data_async(ip, [total_oid], community)
@@ -498,20 +577,23 @@ async def get_counters_snmp(ip, community, model_name=""):
     if total_count:
         try:
             total = int(total_count)
+            # Assume total is black & white if color is not specified
             return {'color': 0, 'bw': total, 'sum': total, 'status': 'OK'}
         except (ValueError, TypeError):
             logging.warning(f"[{ip}] Nie udalo sie przetworzyc sumy licznika SNMP.")
     return None
 
 def get_web_data_with_selenium(driver, ip_address):
-    """Probuje pobrac dane przez HTTP (sprawdzona metoda dla Toshib)."""
+    """Pobiera dane przez HTTP, używając WebDriverWait dla większej stabilności."""
     try:
-        logging.info(f"[{ip_address}] Rozpoczynam probe web scrapingu przez HTTP...")
+        logging.info(f"[{ip_address}] Rozpoczynam próbę web scrapingu przez HTTP...")
         web_data = {'status': 'OK'}
-        driver.set_page_load_timeout(30)
+        wait = WebDriverWait(driver, 25)
 
+        # Pobierz informacje o urządzeniu
         driver.get(f"http://{ip_address}/?MAIN=DEVICE")
-        time.sleep(2); driver.switch_to.frame("TopLevelFrame"); time.sleep(1); driver.switch_to.frame("contents"); time.sleep(1)
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         name_tag = soup.find(id='DeviceName')
@@ -520,8 +602,10 @@ def get_web_data_with_selenium(driver, ip_address):
         if location_tag: web_data['location'] = location_tag.get_text(strip=True)
         driver.switch_to.default_content()
 
+        # Pobierz informacje o licznikach
         driver.get(f"http://{ip_address}/?MAIN=COUNTER&SUB=TOTAL")
-        time.sleep(2); driver.switch_to.frame("TopLevelFrame"); time.sleep(1); driver.switch_to.frame("contents"); time.sleep(1)
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         color_cell = soup.find('td', id='TotalFullColor')
@@ -531,18 +615,18 @@ def get_web_data_with_selenium(driver, ip_address):
         driver.switch_to.default_content()
 
         if web_data.get('color') is None or web_data.get('bw') is None:
-             logging.warning(f"[{ip_address}] Polaczono, ale nie znaleziono elementow licznika na stronie.")
+             logging.warning(f"[{ip_address}] Połączono, ale nie znaleziono elementów licznika na stronie.")
              return None
         
-        logging.info(f"[{ip_address}] Web scraping zakonczony sukcesem.")
+        logging.info(f"[{ip_address}] Web scraping zakończony sukcesem.")
         return web_data
 
     except (TimeoutException, WebDriverException) as e:
-        logging.warning(f"[{ip_address}] Web scraping nie powiodl sie: {type(e).__name__}")
+        logging.warning(f"[{ip_address}] Web scraping nie powiódł się: {type(e).__name__}")
         driver.switch_to.default_content()
         return 'offline'
     except Exception as e:
-        logging.error(f"[{ip_address}] Niespodziewany blad podczas web scrapingu: {e}", exc_info=True)
+        logging.error(f"[{ip_address}] Niespodziewany błąd podczas web scrapingu: {e}", exc_info=True)
         driver.switch_to.default_content()
         return None
 
@@ -567,15 +651,10 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     driver = None
 
     try:
-        logging.info("Uruchamianie Selenium na potrzeby zbierania danych o licznikach...")
-        chrome_options = Options()
-        chrome_options.binary_location = config['WWW']['chrome_binary']
-        if config['WWW'].getboolean('headless', fallback=True):
-            chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox"); chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument('--blink-settings=imagesEnabled=false')
-        chrome_options.set_capability('acceptInsecureCerts', True) 
-        driver = webdriver.Chrome(options=chrome_options)
+        driver = init_selenium_driver(config)
+        if not driver:
+            logging.error("Zatrzymuje dzialanie z powodu bledu inicjalizacji Selenium.")
+            return
 
         logging.info(f"Sprawdzanie tonerow i licznikow dla {len(printers)} drukarek...")
         
@@ -628,7 +707,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'))
+                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'), custom_oids)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 elif web_data == 'offline':
@@ -688,16 +767,10 @@ async def report_counters(force_email=False, ip_to_test=None):
     driver = None
 
     try:
-        logging.info("Uruchamianie Selenium na potrzeby zbierania danych o licznikach...")
-        chrome_options = Options()
-        chrome_options.binary_location = config['WWW']['chrome_binary']
-        if config['WWW'].getboolean('headless', fallback=True):
-            chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument('--blink-settings=imagesEnabled=false')
-        chrome_options.set_capability('acceptInsecureCerts', True)
-        driver = webdriver.Chrome(options=chrome_options)
+        driver = init_selenium_driver(config)
+        if not driver:
+            logging.error("Zatrzymuje generowanie raportu z powodu bledu inicjalizacji Selenium.")
+            return
 
         logging.info(f"Zbieranie danych o licznikach dla {len(printers)} drukarek...")
         
@@ -710,6 +783,7 @@ async def report_counters(force_email=False, ip_to_test=None):
             counter_data_row = {'ip': ip, **base_info}
             
             # Proba odczytu na żywo
+            custom_oids = get_custom_oids_for_ip(config, ip)
             web_data = get_web_data_with_selenium(driver, ip)
             
             if web_data and web_data != 'offline':
@@ -718,7 +792,7 @@ async def report_counters(force_email=False, ip_to_test=None):
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'))
+                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'), custom_oids)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 else:
@@ -902,9 +976,19 @@ async def main():
         parser.print_help()
 
 if __name__ == "__main__":
+    LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
+
     if not PANDAS_AVAILABLE:
         logging.warning("UWAGA: 'pandas' i 'openpyxl' nie sa zainstalowane. Raporty Excel nie beda dzialac.")
+
     try:
         asyncio.run(main())
     except Exception as e:
         logging.critical(f"Wystapil nieoczekiwany blad: {e}")
+    finally:
+        if os.path.exists(LOCK_FILE):
+            try:
+                os.remove(LOCK_FILE)
+                logging.info(f"Plik blokady '{LOCK_FILE}' zostal usuniety.")
+            except OSError as e:
+                logging.error(f"Nie udalo sie usunac pliku blokady '{LOCK_FILE}': {e}")
