@@ -48,7 +48,6 @@ Projekt został zaprojektowany z myślą o elastyczności i łatwej rozbudowie.
 ├── printers_counters.csv # Lista adresów IP drukarek do raportów liczników
 ├── printers.db         # Baza danych SQLite (tworzona automatycznie)
 ├── README.md           # Ta dokumentacja
-├── requirements.txt    # Lista zależności Python
 └── templates/
     └── index.html      # Szablon HTML dla dashboardu
 ```
