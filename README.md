@@ -227,5 +227,3 @@ Aby w pełni zautomatyzować monitorowanie, można dodać odpowiednie wpisy do `
 ## Informacje dodatkowe
 
 *   **Autor**: Łukasz Kurenda
-*   **Audyt i refaktoryzacja**: Jules (AI)
-*   **Copyright**: © 2025 Urząd Zamówień Publicznych
