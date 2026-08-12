@@ -549,31 +549,22 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
         logging.info(f"[{ip}] Używam niestandardowych OID-ów do odczytu liczników stron.")
         color_oid = custom_oids.get('oid_color_count')
         bw_oid = custom_oids.get('oid_bw_count')
-        oids_to_fetch = [color_oid, bw_oid]
-
-        data = await get_snmp_data_async(ip, oids_to_fetch, community)
+        data = await get_snmp_data_async(ip, [color_oid, bw_oid], community)
 
         color_count_str = data.get(color_oid)
         bw_count_str = data.get(bw_oid)
 
         try:
+            if color_count_str is None and bw_count_str is None:
+                logging.warning(f"[{ip}] Niestandardowe OID-y liczników nie zwróciły żadnych wartości.")
+                return None
+
             color_count = int(color_count_str) if color_count_str is not None else 0
             bw_count = int(bw_count_str) if bw_count_str is not None else 0
-            total_count = color_count + bw_count
-
-            if color_count_str is None and bw_count_str is None:
-                 logging.warning(f"[{ip}] Niestandardowe OID-y liczników nie zwróciły żadnych wartości.")
-                 return None
-
-            return {'color': color_count, 'bw': bw_count, 'sum': total_count, 'status': 'OK'}
+            return {'color': color_count, 'bw': bw_count, 'sum': color_count + bw_count, 'status': 'OK'}
         except (ValueError, TypeError) as e:
             logging.warning(f"[{ip}] Nie udało się przetworzyć niestandardowych wartości liczników SNMP. Sprawdź OID-y. Błąd: {e}")
             return None
-
-    # Fallback to a generic total counter if custom OIDs are not provided or incomplete
-
-async def get_counters_snmp(ip, community, model_name=""):
-    """Ogolna funkcja do odczytu calkowitej liczby stron przez SNMP (Fallback)."""
 
     logging.info(f"[{ip}] Uzywam ogolnej metody SNMP do odczytu sumy licznikow (Fallback).")
     total_oid = '1.3.6.1.2.1.43.10.2.1.4.1.1'
