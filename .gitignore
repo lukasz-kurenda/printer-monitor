@@ -27,3 +27,6 @@ venv/
 # Raporty / artefakty
 *.xlsx
 debug.html
+
+# Symulator - stan rotacji (lokalny)
+simulator/state.json

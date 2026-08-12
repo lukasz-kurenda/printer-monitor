@@ -1,0 +1,156 @@
+# -*- coding: utf-8 -*-
+"""CLI rotacji stanow symulowanych drukarek (hot-reload przez state.json).
+
+Przyklady:
+    python simulator/rotate.py list
+    python simulator/rotate.py write-csv
+    python simulator/rotate.py offline 172.21.0.11 true
+    python simulator/rotate.py toner 172.21.0.15 "Toner Black" --current 120
+    python simulator/rotate.py toner 172.21.0.19 "Toner Black" --level 3
+    python simulator/rotate.py toner 172.21.0.19 "Toner Black" --current -3
+    python simulator/rotate.py counters 172.21.0.12 5000 8000
+    python simulator/rotate.py reset
+
+--current -3  = specjalna wartosc SNMP (status 'low' w main.py)
+--level N     = poziom % (przeliczany na current z max z seed)
+"""
+
+import argparse
+import json
+import os
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SEED_FILE = os.path.join(BASE_DIR, "seed.json")
+STATE_FILE = os.path.join(BASE_DIR, "state.json")
+PRINTERS_CSV = os.path.join(BASE_DIR, "..", "printers.csv")
+PRINTERS_COUNTERS_CSV = os.path.join(BASE_DIR, "..", "printers_counters.csv")
+
+
+def load_seed():
+    with open(SEED_FILE, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return {}
+    with open(STATE_FILE, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def save_state(state):
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=2)
+    os.replace(tmp, STATE_FILE)
+
+
+def find_printer(seed, ip):
+    for printer in seed["printers"]:
+        if printer["ip"] == ip:
+            return printer
+    return None
+
+
+def cmd_list(seed, state):
+    for printer in seed["printers"]:
+        over = state.get(printer["ip"], {})
+        offline = over.get("offline", False)
+        toners = ", ".join("%s=%d" % (t["desc"], t["current"]) for t in printer["toners"])
+        counters = printer.get("counters", {})
+        print("%s  offline=%s  %s  | %s | color=%d bw=%d"
+              % (printer["ip"], offline, printer["name"], toners,
+                 counters.get("color", 0), counters.get("bw", 0)))
+
+
+def cmd_offline(state, ip, value):
+    target = state.setdefault(ip, {})
+    target["offline"] = value
+    save_state(state)
+    print("offline %s = %s" % (ip, value))
+
+
+def cmd_toner(seed, state, ip, desc, current=None, level=None):
+    printer = find_printer(seed, ip)
+    if not printer:
+        sys.exit("Nie ma drukarki o IP %s" % ip)
+    toner = next((t for t in printer["toners"] if t["desc"] == desc), None)
+    if not toner:
+        sys.exit("Brak tonera '%s' u %s. Dostepne: %s"
+                 % (desc, ip, ", ".join(t["desc"] for t in printer["toners"])))
+    if current is None and level is None:
+        sys.exit("Podaj --current albo --level")
+    if level is not None:
+        current = round(toner["max"] * float(level) / 100.0)
+    over = state.setdefault(ip, {}).setdefault("toners", {}).setdefault(desc, {})
+    over["current"] = current
+    save_state(state)
+    print("toner %s '%s' current=%d (max=%d)" % (ip, desc, current, toner["max"]))
+
+
+def cmd_counters(state, ip, color, bw):
+    over = state.setdefault(ip, {}).setdefault("counters", {})
+    over["color"] = color
+    over["bw"] = bw
+    save_state(state)
+    print("counters %s color=%d bw=%d" % (ip, color, bw))
+
+
+def cmd_reset():
+    if os.path.exists(STATE_FILE):
+        os.remove(STATE_FILE)
+    print("state.json usuniety - powrot do seed")
+
+
+def cmd_write_csv(seed):
+    ips = [p["ip"] for p in seed["printers"]]
+    for path in (PRINTERS_CSV, PRINTERS_COUNTERS_CSV):
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(ips) + "\n")
+        print("Zapisano: %s (%d IP)" % (os.path.abspath(path), len(ips)))
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Rotacja stanow symulatora drukarek")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    sub.add_parser("list", help="lista drukarek i stanow")
+    sub.add_parser("reset", help="wyczysc nadpisania stanow")
+    sub.add_parser("write-csv", help="zapisz IP do printers.csv / printers_counters.csv")
+
+    p_offline = sub.add_parser("offline", help="wylacz/wlacz drukarke (SNMP+web)")
+    p_offline.add_argument("ip")
+    p_offline.add_argument("value", type=lambda v: v.lower() == "true")
+
+    p_toner = sub.add_parser("toner", help="ustaw toner")
+    p_toner.add_argument("ip")
+    p_toner.add_argument("desc")
+    p_toner.add_argument("--current", type=int, default=None)
+    p_toner.add_argument("--level", type=float, default=None)
+
+    p_counters = sub.add_parser("counters", help="ustaw liczniki")
+    p_counters.add_argument("ip")
+    p_counters.add_argument("color", type=int)
+    p_counters.add_argument("bw", type=int)
+
+    args = parser.parse_args()
+    seed = load_seed()
+    state = load_state()
+
+    if args.cmd == "list":
+        cmd_list(seed, state)
+    elif args.cmd == "offline":
+        cmd_offline(state, args.ip, args.value)
+    elif args.cmd == "toner":
+        cmd_toner(seed, state, args.ip, args.desc, args.current, args.level)
+    elif args.cmd == "counters":
+        cmd_counters(state, args.ip, args.color, args.bw)
+    elif args.cmd == "reset":
+        cmd_reset()
+    elif args.cmd == "write-csv":
+        cmd_write_csv(seed)
+
+
+if __name__ == "__main__":
+    main()

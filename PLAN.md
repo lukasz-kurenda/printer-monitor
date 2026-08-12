@@ -173,6 +173,8 @@ flowchart TB
 | Coverage: Agents | ✅ @builder/@validator/@ops/@analyst przypisani do wszystkich workstreamów |
 | Grill-me | 🟢 READY po Q1–Q4 (raport: `/opt/gabson/grill-reports/prnt-mon-2026-08-12.md`, do usunięcia po /15) |
 | SEC-K1 status | ✅ **WYKONANE 2026-08-12**: filter-repo (config.ini, secret.key, printers*.csv, *.db, *.log, debug.html, docx, gitignore.txt), precyzyjny skan 0 trafień (host + zdalny + kontener), force-push `0955c59`, kontener przesynchronizowany, backup mirror lokalnie (`prnt-mon-backup/printer-monitor.git`, do skasowania po potwierdzeniu) |
+| CI status | ✅ **ZIELONE** (2026-08-12): FIX-K2 merged (commit `0b19d82`), 15 testów `tests/test_core.py`, `pytest.ini` pythonpath (`91e589a`), flake8 0 fatali |
+| PoC-2 symulator | ✅ **DZIAŁA** (2026-08-12): `simulator/` — SNMP agent 12×:161 (pysnmp 7 asyncio), web mock 12×:80 (frameset/Selenium), seed 12 drukarek, rotate CLI (hot-reload state.json), aliasy IP (NET_ADMIN). Weryfikacja: tonery/alerty (3% kryt., 18%/9% niski), web scraping liczników OK, wykluczenia Waste/Drum/Developer OK, offline → OFFLINE (timeout+fallback) OK, dashboard 12 kart OK |
 | `coverage_gate` | **pass** |
 
 - Approval: **CEO — decyzja `taste`** (ADR-017, `AUTO_APPROVE_PLAN=false`)
