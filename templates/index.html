@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="author" content="Łukasz Kurenda">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Dashboard Drukarek</title>
     <style>
         :root {
@@ -153,6 +154,10 @@
         <div class="controls">
             <button id="updateBtn" class="btn btn-secondary">Aktualizuj stan tonerów w drukarkach</button>
             <button id="reportBtn" class="btn btn-primary">Generuj raport liczników z drukarek</button>
+            <form method="post" action="/logout" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-secondary">Wyloguj</button>
+            </form>
         </div>
 
         <div class="grid">
@@ -225,8 +230,12 @@
                 const originalText = button.textContent;
                 button.disabled = true;
                 button.textContent = loadingText;
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
-                fetch(endpoint, { method: 'POST' })
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': csrfToken }
+                })
                     .then(response => response.json())
                     .then(data => {
                         showNotification(data.message, data.status === 'error');

@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 
-import sqlite3
-from flask import Flask, render_template, jsonify
-import logging
-from datetime import datetime
-import os
-import configparser
-import subprocess
 import csv
+import configparser
+import hmac
+import logging
+import os
+import secrets
+import sqlite3
+import subprocess
 import sys
+from datetime import datetime
+
+from flask import (Flask, jsonify, redirect, render_template, request, session,
+                   url_for)
 
 # --- Konfiguracja ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +22,66 @@ CONFIG_FILE = os.path.join(BASE_DIR, 'config.ini')
 PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.csv')
 LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
 app = Flask(__name__)
+
+
+# --- Autoryzacja (SEC-K3) ---
+# Token pobierany z env DASH_AUTH_TOKEN lub [WWW] auth_token w config.ini.
+# Bez skonfigurowanego tokenu dashboard zwraca 503 (fail-closed).
+
+def load_auth_token():
+    token = os.environ.get('DASH_AUTH_TOKEN')
+    if token:
+        return token.strip()
+    parser = configparser.ConfigParser()
+    try:
+        parser.read(CONFIG_FILE, encoding='utf-8')
+        if parser.has_option('WWW', 'auth_token'):
+            return parser.get('WWW', 'auth_token').strip()
+    except Exception:
+        pass
+    return ''
+
+
+AUTH_TOKEN = load_auth_token()
+app.secret_key = AUTH_TOKEN or 'prnt-mon-session-signing-fallback'
+
+
+@app.before_request
+def require_auth_and_csrf():
+    if not AUTH_TOKEN:
+        return ("Blad: brak tokenu autoryzacji. Ustaw DASH_AUTH_TOKEN (env) "
+                "lub auth_token w sekcji [WWW] config.ini.", 503)
+    if request.endpoint in ('login', 'static'):
+        return None
+    if not session.get('authenticated'):
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        csrf = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+        if not csrf or csrf != session.get('csrf_token'):
+            return jsonify({'status': 'error', 'message': 'Nieprawidlowy token CSRF.'}), 403
+    return None
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        token = (request.form.get('token') or '').strip()
+        if AUTH_TOKEN and hmac.compare_digest(token, AUTH_TOKEN):
+            session['authenticated'] = True
+            session['csrf_token'] = secrets.token_hex(16)
+            return redirect(url_for('index'))
+        return render_template('login.html', error='Nieprawidlowy token.',
+                               csrf_token=session.get('csrf_token', '')), 401
+    if session.get('authenticated'):
+        return redirect(url_for('index'))
+    session['csrf_token'] = session.get('csrf_token') or secrets.token_hex(16)
+    return render_template('login.html', error=None, csrf_token=session['csrf_token'])
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 # --- Funkcje pomocnicze ---
 def load_printers_from_csv():
@@ -155,7 +219,9 @@ def index():
     
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Przekaż nową zmienną do szablonu
-    return render_template('index.html', printers=final_printer_list, current_time=current_time, last_run_time=last_run_time)
+    return render_template('index.html', printers=final_printer_list,
+                           current_time=current_time, last_run_time=last_run_time,
+                           csrf_token=session.get('csrf_token', ''))
 
 @app.route('/run-report-counters', methods=['POST'])
 def run_report_counters():
@@ -212,9 +278,11 @@ def run_check_toner():
         return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
 
 if __name__ == '__main__':
+    if not AUTH_TOKEN:
+        logging.critical("KRYTYCZNY BLAD: Brak tokenu autoryzacji (DASH_AUTH_TOKEN / [WWW] auth_token).")
     if not os.path.exists(DB_FILE):
         logging.critical(f"KRYTYCZNY BLAD: Plik bazy danych '{DB_FILE}' nie istnieje!")
         logging.critical("Uruchom najpierw skrypt 'main.py --check-toner', aby go utworzyc.")
     else:
-        app.run(host='0.0.0.0', port=5001, debug=True)
+        app.run(host='127.0.0.1', port=5001, debug=False)
 

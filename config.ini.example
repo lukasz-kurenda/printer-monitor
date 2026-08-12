@@ -29,6 +29,7 @@ snmp_port = 161
 [WWW]
 chrome_binary = /usr/bin/chromium
 headless = true
+auth_token = WYGENERUJ: python -c "import secrets; print(secrets.token_urlsafe(24))"
 report_day = 1
 
 [CUSTOM_OIDS]

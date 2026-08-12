@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie - Dashboard Drukarek</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-box {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            padding: 30px 35px;
+            width: 320px;
+            text-align: center;
+        }
+        .login-box h1 { font-size: 1.3rem; color: #343a40; margin-bottom: 0.5rem; }
+        .login-box p { color: #6c757d; font-size: 0.9rem; margin-top: 0; }
+        .login-box input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 15px 0 10px 0;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .login-box button:hover { background-color: #0056b3; }
+        .error { color: #d9534f; font-size: 0.9rem; margin: 10px 0 0 0; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>Dashboard Drukarek</h1>
+        <p>Podaj token dostępu</p>
+        {% if error %}
+        <p class="error">{{ error }}</p>
+        {% endif %}
+        <form method="post" action="/login">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="password" name="token" placeholder="Token dostępu" required autofocus>
+            <button type="submit">Zaloguj</button>
+        </form>
+    </div>
+</body>
+</html>

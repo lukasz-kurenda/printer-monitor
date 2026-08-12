@@ -196,14 +196,31 @@ Skrypt `main.py` można uruchamiać z różnymi flagami:
 
 ### Dashboard webowy
 
-Aby uruchomić interfejs webowy, wykonaj polecenie:
+Dashboard wymaga tokenu autoryzacji (SEC-K3). Ustaw go w `[WWW] auth_token` w `config.ini`
+lub w zmiennej środowiskowej `DASH_AUTH_TOKEN` (env ma pierwszeństwo):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(24))"   # wygeneruj token
+```
+
+Uruchomienie produkcyjne (gunicorn, bind lokalny — dostęp z przeglądarki przez `http://localhost:5001`):
+
+```bash
+gunicorn -w 1 --bind 127.0.0.1:5001 dashboard:app
+```
+
+Tryb deweloperski (bez serwera produkcyjnego; nadal `debug=False`):
 ```bash
 python dashboard.py
 ```
-Dashboard umożliwia:
+
+Po zalogowaniu tokenem dashboard umożliwia:
 *   Przeglądanie stanu tonerów wszystkich drukarek.
 *   Ręczne uruchomienie skryptu sprawdzania tonerów (z wysyłką e-mail).
 *   Ręczne wygenerowanie i wysłanie raportu liczników.
+
+Bez ważnej sesji wszystkie ścieżki przekierowują na `/login`; zapytania POST bez
+tokenu CSRF (nagłówek `X-CSRF-Token`) są odrzucane (HTTP 403).
 
 ### Automatyzacja (Cron)
 
