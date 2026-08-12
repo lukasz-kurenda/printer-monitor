@@ -172,6 +172,7 @@ flowchart TB
 | Coverage: Risks | ✅ K1→paczkа SEC-K1, K2→US-01/02, K3→US-04, symulator→US-11/12 (PoC-2), ekspozycja→US-13 (Q2) |
 | Coverage: Agents | ✅ @builder/@validator/@ops/@analyst przypisani do wszystkich workstreamów |
 | Grill-me | 🟢 READY po Q1–Q4 (raport: `/opt/gabson/grill-reports/prnt-mon-2026-08-12.md`, do usunięcia po /15) |
+| SEC-K1 status | ✅ **WYKONANE 2026-08-12**: filter-repo (config.ini, secret.key, printers*.csv, *.db, *.log, debug.html, docx, gitignore.txt), precyzyjny skan 0 trafień (host + zdalny + kontener), force-push `0955c59`, kontener przesynchronizowany, backup mirror lokalnie (`prnt-mon-backup/printer-monitor.git`, do skasowania po potwierdzeniu) |
 | `coverage_gate` | **pass** |
 
 - Approval: **CEO — decyzja `taste`** (ADR-017, `AUTO_APPROVE_PLAN=false`)
