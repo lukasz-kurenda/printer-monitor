@@ -177,6 +177,8 @@ flowchart TB
 | PoC-2 symulator | ✅ **DZIAŁA** (2026-08-12): `simulator/` — SNMP agent 12×:161 (pysnmp 7 asyncio), web mock 12×:80 (frameset/Selenium), seed 12 drukarek, rotate CLI (hot-reload state.json), aliasy IP (NET_ADMIN). Weryfikacja: tonery/alerty (3% kryt., 18%/9% niski), web scraping liczników OK, wykluczenia Waste/Drum/Developer OK, offline → OFFLINE (timeout+fallback) OK, dashboard 12 kart OK |
 | SEC-K3 status | ✅ **WYKONANE** (2026-08-12, commit `4103856`): login token (env `DASH_AUTH_TOKEN`/`[WWW] auth_token`), sesja signed cookie (HttpOnly/SameSite=Strict), CSRF na POST (403 bez tokenu), fail-closed 503 bez tokenu, `debug=False`, bind `127.0.0.1:5001`, gunicorn `-w 1`; 8 testów auth (razem 23/23); README zaktualizowany; weryfikacja live: redirect→login, 401 zły token, 403 bez CSRF, 12 kart po zalogowaniu |
 | `coverage_gate` | **pass** |
+| W5/W6/W8/W10 + SHOULD | ✅ **WYKONANE** (2026-08-12, commit `7f30fb1`): lockfile PID-based (stale-lock, 409 na dashboardzie), html.escape w mailach, walidacja IP, izolacja bledow per-drukarka, timeouty/retries/port z configu, timestamp alertu po sukcesie SMTP; SHOULD: web scraping rownolegly (25s vs 65s, web_workers), rotacja logow RotatingFileHandler; 38/38 testow |
+
 
 - Approval: **CEO — decyzja `taste`** (ADR-017, `AUTO_APPROVE_PLAN=false`)
 - Po APPROVED + Q1–Q4 → Brownfield routing: **`/20` Dev** (MUST-HAVE 1–7 wg kolejności zależności)
