@@ -203,15 +203,19 @@ lub w zmiennej środowiskowej `DASH_AUTH_TOKEN` (env ma pierwszeństwo):
 python -c "import secrets; print(secrets.token_urlsafe(24))"   # wygeneruj token
 ```
 
-Uruchomienie produkcyjne (gunicorn, bind lokalny — dostęp z przeglądarki przez `http://localhost:5001`):
+Uruchomienie produkcyjne (gunicorn + Docker, dostęp przez `http://localhost:5001`):
 
 ```bash
-gunicorn -w 1 --bind 127.0.0.1:5001 dashboard:app
+# w kontenerze (app bindowany na 0.0.0.0 - ekspozycje ogranicza docker -p)
+gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app
+
+# na hoscie - publikacja TYLKO na loopbacku (SEC-K3):
+docker run -p 127.0.0.1:5001:5001 ...
 ```
 
-Tryb deweloperski (bez serwera produkcyjnego; nadal `debug=False`):
+Tryb deweloperski (bez serwera produkcyjnego; nadal `debug=False`, bind lokalny):
 ```bash
-python dashboard.py
+python dashboard.py   # slucha na 127.0.0.1:5001
 ```
 
 Po zalogowaniu tokenem dashboard umożliwia:
