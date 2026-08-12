@@ -1,0 +1,39 @@
+# ===== config.ini.example — skopiuj do config.ini i wypelnij =====
+[SMTP]
+server = SMTP_SERVER
+port = 587
+user = SMTP_USER
+password = (wygeneruj: python encrypt_util.py --generate-key; python encrypt_util.py --encrypt)
+use_tls = true
+sender_email = SMTP_SENDER
+
+[EMAILS]
+recipient_email_toner_low = ODBIORCA_1
+recipient_email_toner_critical = ODBIORCA_2
+recipient_email_counters = ODBIORCA_3
+recipient_email_errors = ODBIORCA_4
+
+[MONITORING]
+printers_file = printers.csv
+log_file = printer_monitor.log
+toner_threshold_low = 20
+toner_low_status_percent = 5
+toner_threshold_critical = 5
+snmp_community = public
+toner_filter_keywords = toner, kaseta, cartridge, tusz
+toner_exclude_keywords = waste,beben,developer,fuser,utrwalajacy,obraz,konserwacyjny,maintenance,roller,limiter
+snmp_timeout = 2
+snmp_retries = 2
+snmp_port = 161
+
+[WWW]
+chrome_binary = /usr/bin/chromium
+headless = true
+report_day = 1
+
+[CUSTOM_OIDS]
+oid_desc =
+oid_max =
+oid_current =
+oid_color_count =
+oid_bw_count =

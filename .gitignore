@@ -1,0 +1,29 @@
+# Pliki konfiguracyjne i klucze
+secret.key
+config.ini
+*.env
+
+# Baza danych
+printers.db
+*.db
+
+# Logi
+*.log
+cron.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Edytory / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Raporty / artefakty
+*.xlsx
+debug.html
