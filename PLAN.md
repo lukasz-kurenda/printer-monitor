@@ -210,3 +210,11 @@ Sprint z PLAN (MUST 1-7 + SHOULD): **ALL DONE** — FIX-K2 (0b19d82), SEC-K1 (09
 - **Digest**: reports/session_digest.md
 - **Clean**: __pycache__/.pytest_cache usuniete
 - **[STABILIZE_REPORT] Fix 0 | Refactor 2 | Security 0 threats | Digest tak | Clean tak**
+
+### [/55 Deploy] 2026-08-12
+- **Gate DEPLOY**: autoryzacja CEO "wykonaj w pelni autonomicznie" (2026-08-12) — pre-deploy checklist: testy 38/38 ✅, UAT ✅, security PASS ✅, brak migracji DB ✅, env skonfigurowane ✅, rollback zdefiniowany ✅
+- **CI/CD**: GitHub Actions python-app.yml (lint+test) — istniejaca; env: dev(lokalny kontener) = prod (repo prywatne, single-env)
+- **Deploy**: kontener zsynchronizowany z main + restart gunicorn (nowy dashboard); feature flags: [SKIPPED] — MVP single-user bez flag (decyzja 3.5c)
+- **Rollback**: snapshot `prnt-mon:rollback-20260812` (docker commit)
+- **Post-deploy smoke**: /login 200 ✅ | main.py --check-toner EXIT=0 25s, 2 podsumowania, 12xSNMP ✅ | gunicorn.log bez bledow ✅
+- **[DEPLOY_LOG] deploy 2026-08-12 23:5x | wersja: main @ f7e5f39+ (lokalnie) | smoke PASS | rollback: prnt-mon:rollback-20260812**
