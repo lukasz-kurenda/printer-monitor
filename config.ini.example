@@ -25,6 +25,7 @@ toner_exclude_keywords = waste,beben,developer,fuser,utrwalajacy,obraz,konserwac
 snmp_timeout = 2
 snmp_retries = 2
 snmp_port = 161
+web_workers = 3
 
 [WWW]
 chrome_binary = /usr/bin/chromium

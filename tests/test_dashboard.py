@@ -7,6 +7,7 @@ import sqlite3
 os.environ.setdefault('DASH_AUTH_TOKEN', 'test-token-123')
 
 import dashboard  # noqa: E402
+import lockfile  # noqa: E402
 import pytest  # noqa: E402
 
 TOKEN = 'test-token-123'
@@ -103,3 +104,13 @@ def test_logout_clears_session(client):
     rv = client.post('/logout', headers={'X-CSRF-Token': 'csrf123'})
     assert rv.status_code == 302
     assert client.get('/').status_code == 302
+
+
+def test_run_check_toner_409_when_locked(client):
+    _auth(client, csrf='csrf123')
+    assert lockfile.acquire(dashboard.LOCK_FILE) is True
+    try:
+        rv = client.post('/run-check-toner', headers={'X-CSRF-Token': 'csrf123'})
+        assert rv.status_code == 409
+    finally:
+        lockfile.release(dashboard.LOCK_FILE)

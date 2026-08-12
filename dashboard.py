@@ -4,6 +4,7 @@ import csv
 import configparser
 import hmac
 import logging
+import logging.handlers
 import os
 import secrets
 import sqlite3
@@ -14,14 +15,40 @@ from datetime import datetime
 from flask import (Flask, jsonify, redirect, render_template, request, session,
                    url_for)
 
+import lockfile
+
 # --- Konfiguracja ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s')
 DB_FILE = os.path.join(BASE_DIR, 'printers.db')
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.ini')
 PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.csv')
 LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
 app = Flask(__name__)
+
+
+def setup_logging():
+    """Logowanie do konsoli + rotujacy plik (SHOULD: rotacja logow)."""
+    fmt = '%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if root.handlers:
+        for handler in root.handlers:
+            handler.setFormatter(logging.Formatter(fmt))
+        return
+    stream = logging.StreamHandler()
+    stream.setFormatter(logging.Formatter(fmt))
+    root.addHandler(stream)
+    try:
+        rotating = logging.handlers.RotatingFileHandler(
+            os.path.join(BASE_DIR, 'printer_monitor.log'),
+            maxBytes=1024 * 1024, backupCount=3, encoding='utf-8')
+        rotating.setFormatter(logging.Formatter(fmt))
+        root.addHandler(rotating)
+    except OSError:
+        pass
+
+
+setup_logging()
 
 
 # --- Autoryzacja (SEC-K3) ---
@@ -226,13 +253,10 @@ def index():
 @app.route('/run-report-counters', methods=['POST'])
 def run_report_counters():
     """Uruchamia w tle skrypt generujacy raport licznikow, z mechanizmem blokady."""
-    if os.path.exists(LOCK_FILE):
+    if lockfile.is_locked(LOCK_FILE, max_age_seconds=3600):
         return jsonify({'status': 'error', 'message': 'Inny proces jest już uruchomiony. Spróbuj ponownie za chwilę.'}), 409
 
     try:
-        with open(LOCK_FILE, 'w') as f:
-            f.write(str(datetime.now()))
-
         python_executable = sys.executable
         main_script_path = os.path.join(BASE_DIR, 'main.py')
         log_file = os.path.join(BASE_DIR, 'cron.log')
@@ -241,25 +265,18 @@ def run_report_counters():
         success, message = run_background_script(command_list, log_file)
         if success:
             return jsonify({'status': 'success', 'message': 'Zlecono generowanie raportu. E-mail zostanie wysłany po zakończeniu.'})
-        else:
-            os.remove(LOCK_FILE)
-            return jsonify({'status': 'error', 'message': message}), 500
+        return jsonify({'status': 'error', 'message': message}), 500
     except Exception as e:
-        logging.error(f"Blad podczas tworzenia blokady lub uruchamiania skryptu: {e}")
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+        logging.error(f"Blad podczas uruchamiania skryptu: {e}")
         return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
 
 @app.route('/run-check-toner', methods=['POST'])
 def run_check_toner():
     """Uruchamia w tle skrypt sprawdzajacy stan tonerow, z mechanizmem blokady."""
-    if os.path.exists(LOCK_FILE):
+    if lockfile.is_locked(LOCK_FILE, max_age_seconds=3600):
         return jsonify({'status': 'error', 'message': 'Inny proces jest już uruchomiony. Spróbuj ponownie za chwilę.'}), 409
 
     try:
-        with open(LOCK_FILE, 'w') as f:
-            f.write(str(datetime.now()))
-
         python_executable = sys.executable
         main_script_path = os.path.join(BASE_DIR, 'main.py')
         log_file = os.path.join(BASE_DIR, 'cron.log')
@@ -268,13 +285,9 @@ def run_check_toner():
         success, message = run_background_script(command_list, log_file)
         if success:
             return jsonify({'status': 'success', 'message': 'Zlecono aktualizację stanów tonerów. Odśwież stronę za chwilę.'})
-        else:
-            os.remove(LOCK_FILE)
-            return jsonify({'status': 'error', 'message': message}), 500
+        return jsonify({'status': 'error', 'message': message}), 500
     except Exception as e:
-        logging.error(f"Blad podczas tworzenia blokady lub uruchamiania skryptu: {e}")
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+        logging.error(f"Blad podczas uruchamiania skryptu: {e}")
         return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
 
 if __name__ == '__main__':

@@ -3,18 +3,25 @@
 import csv
 import argparse
 import configparser
+import html
+import ipaddress
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 import logging
+import logging.handlers
 import asyncio
 import socket
+import sys
 import time
 import os
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 from cryptography.fernet import Fernet
 import sqlite3
+
+import lockfile
 
 # Komponenty do web scrapingu
 from selenium import webdriver
@@ -41,11 +48,38 @@ from pysnmp.error import PySnmpError
 
 # --- Konfiguracja ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s')
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.ini')
 PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.csv')
 PRINTERS_COUNTERS_FILE = os.path.join(BASE_DIR, 'printers_counters.csv')
 DB_FILE = os.path.join(BASE_DIR, 'printers.db')
+LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
+WEB_WORKERS_DEFAULT = 3
+
+
+def setup_logging():
+    """Logowanie do konsoli + rotujacy plik (SHOULD: rotacja logow)."""
+    fmt = '%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if root.handlers:
+        for handler in root.handlers:
+            handler.setFormatter(logging.Formatter(fmt))
+        return
+    stream = logging.StreamHandler()
+    stream.setFormatter(logging.Formatter(fmt))
+    root.addHandler(stream)
+    config = load_config()
+    log_file = 'printer_monitor.log'
+    if config and config.has_option('MONITORING', 'log_file'):
+        log_file = config.get('MONITORING', 'log_file')
+    try:
+        rotating = logging.handlers.RotatingFileHandler(
+            os.path.join(BASE_DIR, log_file), maxBytes=1024 * 1024, backupCount=3,
+            encoding='utf-8')
+        rotating.setFormatter(logging.Formatter(fmt))
+        root.addHandler(rotating)
+    except OSError:
+        pass
 
 
 # --- Funkcje Bazy Danych ---
@@ -240,7 +274,13 @@ def load_printers():
             reader = csv.reader(infile)
             for row in reader:
                 if row and row[0].strip():
-                    printers.append({'ip': row[0].strip()})
+                    candidate = row[0].strip()
+                    try:
+                        ipaddress.ip_address(candidate)
+                    except ValueError:
+                        logging.warning(f"Pominięto niepoprawny adres IP w {PRINTERS_FILE}: {candidate}")
+                        continue
+                    printers.append({'ip': candidate})
     except FileNotFoundError:
         logging.error(f"KRYTYCZNY BLAD: Nie znaleziono pliku '{PRINTERS_FILE}'!")
     return printers
@@ -253,7 +293,13 @@ def load_printers_for_counters():
             reader = csv.reader(infile)
             for row in reader:
                 if row and row[0].strip():
-                    printers.append({'ip': row[0].strip()})
+                    candidate = row[0].strip()
+                    try:
+                        ipaddress.ip_address(candidate)
+                    except ValueError:
+                        logging.warning(f"Pominięto niepoprawny adres IP w {PRINTERS_COUNTERS_FILE}: {candidate}")
+                        continue
+                    printers.append({'ip': candidate})
     except FileNotFoundError:
         logging.warning(f"Plik '{PRINTERS_COUNTERS_FILE}' nie istnieje. Raport licznikow nie zostanie wygenerowany.")
     return printers
@@ -372,12 +418,12 @@ def print_alert_summary(alert_level, alerts):
     print(f"{'='*60}\n")
 
 # --- Funkcje SNMP ---
-async def get_snmp_data_async(ip, oids, community):
+async def get_snmp_data_async(ip, oids, community, timeout=5, retries=1, port=161):
     oids = [oid for oid in oids if oid]
     if not oids: return {}
     
     snmp_engine = SnmpEngine()
-    transport_target = await UdpTransportTarget.create((ip, 161), timeout=5, retries=1)
+    transport_target = await UdpTransportTarget.create((ip, port), timeout=timeout, retries=retries)
     results = {}
     
     try:
@@ -399,18 +445,18 @@ async def get_snmp_data_async(ip, oids, community):
         logging.error(f"[{ip}] Wyjatek w get_snmp_data_async: {e}")
     return results
 
-async def get_printer_base_info(ip, community):
+async def get_printer_base_info(ip, community, timeout=5, retries=1, port=161):
     oids = ['1.3.6.1.2.1.25.3.2.1.3.1', '1.3.6.1.2.1.1.5.0', '1.3.6.1.2.1.1.6.0']
-    data = await get_snmp_data_async(ip, oids, community)
+    data = await get_snmp_data_async(ip, oids, community, timeout=timeout, retries=retries, port=port)
     model = data.get('1.3.6.1.2.1.25.3.2.1.3.1', "Nie odczytano")
     name = data.get('1.3.6.1.2.1.1.5.0', "Brak")
     location = data.get('1.3.6.1.2.1.1.6.0', "Brak")
     return {'model': model, 'name': name, 'location': location}
 
-async def walk_snmp_oid(ip, community, oid):
+async def walk_snmp_oid(ip, community, oid, timeout=10, retries=2, port=161):
     results = {}
     snmp_engine = SnmpEngine()
-    transport_target = await UdpTransportTarget.create((ip, 161), timeout=10, retries=2)
+    transport_target = await UdpTransportTarget.create((ip, port), timeout=timeout, retries=retries)
     var_binds = [ObjectType(ObjectIdentity(oid))]
     while True:
         try:
@@ -445,12 +491,17 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
         'value_is_percentage': 'false'
     }
     low_status_percent = config.getint('MONITORING', 'toner_low_status_percent', fallback=3)
+    snmp_timeout = config.getint('MONITORING', 'snmp_timeout', fallback=5)
+    snmp_retries = config.getint('MONITORING', 'snmp_retries', fallback=2)
+    snmp_port = config.getint('MONITORING', 'snmp_port', fallback=161)
     base_desc_oid = oid_map.get('desc')
     if not base_desc_oid:
         return []
 
     # 1. Odkryj materiały przez SNMP walk
-    discovered_supplies = await walk_snmp_oid(ip, community, base_desc_oid)
+    discovered_supplies = await walk_snmp_oid(ip, community, base_desc_oid,
+                                              timeout=snmp_timeout, retries=snmp_retries,
+                                              port=snmp_port)
     if not discovered_supplies:
         logging.warning(f"[{ip}] Nie znaleziono materialow przez 'walk' dla OID: {base_desc_oid}")
         return []
@@ -473,7 +524,9 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
 
     # 3. Wyślij jedno zbiorcze zapytanie SNMP
     logging.info(f"[{ip}] Odpytuje o {len(oids_to_fetch)} OIDow dla {len(discovered_supplies)} materialow...")
-    all_levels_data = await get_snmp_data_async(ip, oids_to_fetch, community)
+    all_levels_data = await get_snmp_data_async(ip, oids_to_fetch, community,
+                                                timeout=snmp_timeout, retries=snmp_retries,
+                                                port=snmp_port)
 
     # 4. Przetwórz otrzymane dane
     for index, details in supply_details.items():
@@ -539,7 +592,8 @@ def init_selenium_driver(config):
         return None
 
 
-async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
+async def get_counters_snmp(ip, community, model_name="", custom_oids=None,
+                            timeout=5, retries=1, port=161):
     """
     Odczytuje liczniki stron przez SNMP.
     Jeśli zdefiniowano niestandardowe OID-y dla liczników, używa ich.
@@ -549,7 +603,8 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
         logging.info(f"[{ip}] Używam niestandardowych OID-ów do odczytu liczników stron.")
         color_oid = custom_oids.get('oid_color_count')
         bw_oid = custom_oids.get('oid_bw_count')
-        data = await get_snmp_data_async(ip, [color_oid, bw_oid], community)
+        data = await get_snmp_data_async(ip, [color_oid, bw_oid], community,
+                                         timeout=timeout, retries=retries, port=port)
 
         color_count_str = data.get(color_oid)
         bw_count_str = data.get(bw_oid)
@@ -568,7 +623,8 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None):
 
     logging.info(f"[{ip}] Uzywam ogolnej metody SNMP do odczytu sumy licznikow (Fallback).")
     total_oid = '1.3.6.1.2.1.43.10.2.1.4.1.1'
-    total_data = await get_snmp_data_async(ip, [total_oid], community)
+    total_data = await get_snmp_data_async(ip, [total_oid], community,
+                                           timeout=timeout, retries=retries, port=port)
     total_count = total_data.get(total_oid)
     if total_count:
         try:
@@ -628,6 +684,31 @@ def get_web_data_with_selenium(driver, ip_address):
 
 # --- GŁÓWNE FUNKCJE ZADAŃ ---
 
+def scrape_all_with_selenium(ips, config, max_workers=None):
+    """Web scraping wielu drukarek rownolegle (osobny driver Chromium na watek).
+
+    Zwraca {ip: wynik} - wynik jak z get_web_data_with_selenium (dict/'offline'/None).
+    """
+    if max_workers is None:
+        max_workers = config.getint('MONITORING', 'web_workers', fallback=WEB_WORKERS_DEFAULT)
+    results = {}
+
+    def _scrape_one(ip):
+        driver = init_selenium_driver(config)
+        if not driver:
+            logging.error(f"[{ip}] Nie udalo sie zainicjalizowac sterownika Selenium.")
+            return ip, None
+        try:
+            return ip, get_web_data_with_selenium(driver, ip)
+        finally:
+            driver.quit()
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for ip, result in executor.map(_scrape_one, ips):
+            results[ip] = result
+    return results
+
+
 async def check_toner_and_counters(force_email=False, ip_to_test=None):
     """ZINTEGROWANA funkcja do sprawdzania tonerow i licznikow."""
     config = load_config()
@@ -644,21 +725,25 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     critical_toner_alerts = []
     all_toners_data_for_db = []
     all_counters_data = []
-    driver = None
+    snmp_timeout = config.getint('MONITORING', 'snmp_timeout', fallback=5)
+    snmp_retries = config.getint('MONITORING', 'snmp_retries', fallback=2)
+    snmp_port = config.getint('MONITORING', 'snmp_port', fallback=161)
 
-    try:
-        driver = init_selenium_driver(config)
-        if not driver:
-            logging.error("Zatrzymuje dzialanie z powodu bledu inicjalizacji Selenium.")
-            return
+    if not printers:
+        logging.warning("Brak drukarek w printers.csv. Zatrzymuje sprawdzanie.")
+        return
 
-        logging.info(f"Sprawdzanie tonerow i licznikow dla {len(printers)} drukarek...")
-        
-        for printer in printers:
-            ip = printer['ip']
-            if not ip: continue
+    logging.info(f"Sprawdzanie tonerow i licznikow dla {len(printers)} drukarek...")
+    ip_list = [p['ip'] for p in printers if p.get('ip')]
+    web_data_map = scrape_all_with_selenium(ip_list, config)
+
+    for printer in printers:
+        ip = printer['ip']
+        if not ip: continue
+        try:
             logging.info(f"--- Przetwarzanie drukarki: {ip} ---")
-            base_info = await get_printer_base_info(ip, community)
+            base_info = await get_printer_base_info(ip, community, timeout=snmp_timeout,
+                                                    retries=snmp_retries, port=snmp_port)
             
             # --- Zbieranie danych o tonerach ---
             custom_oids = get_custom_oids_for_ip(config, ip)
@@ -695,7 +780,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
             # --- Zbieranie danych o licznikach ---
             logging.info(f"[{ip}] Rozpoczynam odczyt licznikow...")
             counter_data_row = {'ip': ip, **base_info}
-            web_data = get_web_data_with_selenium(driver, ip)
+            web_data = web_data_map.get(ip)
             
             if web_data and web_data != 'offline':
                 if not web_data.get('name'): web_data['name'] = base_info.get('name')
@@ -703,7 +788,9 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'), custom_oids)
+                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'),
+                                                        custom_oids, timeout=snmp_timeout,
+                                                        retries=snmp_retries, port=snmp_port)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 elif web_data == 'offline':
@@ -711,10 +798,9 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 else:
                     counter_data_row.update({'name': 'WYSTAPIL BLAD ODCZYTU', 'status': 'ERROR'})
             all_counters_data.append(counter_data_row)
-    
-    finally:
-        if driver:
-            driver.quit()
+        except Exception as e:
+            logging.error(f"[{ip}] Nieoczekiwany blad przetwarzania drukarki: {e}", exc_info=True)
+            continue
 
     if all_toners_data_for_db: update_toner_status_in_db(all_toners_data_for_db)
     if all_counters_data: save_counter_history(all_counters_data)
@@ -726,16 +812,18 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
         html_body = create_html_report(critical_toner_alerts, today, "Toner", "critical")
         print_alert_summary("KRYTYCZNY", critical_toner_alerts)
         if force_email:
-            send_email_notification(subject, html_body, config, 'recipient_email_toner_critical', priority='high')
-            update_alert_timestamp(critical_toner_alerts)
+            sent = send_email_notification(subject, html_body, config, 'recipient_email_toner_critical', priority='high')
+            if sent:
+                update_alert_timestamp(critical_toner_alerts)
     
     if low_toner_alerts:
         subject = f"[UWAGA] Niski poziom tonerow ({len(low_toner_alerts)} alertow)"
         html_body = create_html_report(low_toner_alerts, today, "Toner", "low")
         print_alert_summary("NISKI", low_toner_alerts)
         if force_email:
-            send_email_notification(subject, html_body, config, 'recipient_email_toner_low')
-            update_alert_timestamp(low_toner_alerts)
+            sent = send_email_notification(subject, html_body, config, 'recipient_email_toner_low')
+            if sent:
+                update_alert_timestamp(low_toner_alerts)
 
     if not critical_toner_alerts and not low_toner_alerts:
         logging.info("✓ Nie wykryto nowych alertow tonerowych wymagajacych powiadomienia.")
@@ -759,28 +847,27 @@ async def report_counters(force_email=False, ip_to_test=None):
         logging.info(f"Test raportu licznikow dla pojedynczej drukarki: {ip_to_test}")
 
     community = config.get('MONITORING', 'snmp_community', fallback='public')
+    snmp_timeout = config.getint('MONITORING', 'snmp_timeout', fallback=5)
+    snmp_retries = config.getint('MONITORING', 'snmp_retries', fallback=2)
+    snmp_port = config.getint('MONITORING', 'snmp_port', fallback=161)
     all_counters_data = []
-    driver = None
 
-    try:
-        driver = init_selenium_driver(config)
-        if not driver:
-            logging.error("Zatrzymuje generowanie raportu z powodu bledu inicjalizacji Selenium.")
-            return
+    logging.info(f"Zbieranie danych o licznikach dla {len(printers)} drukarek...")
+    ip_list = [p['ip'] for p in printers if p.get('ip')]
+    web_data_map = scrape_all_with_selenium(ip_list, config)
 
-        logging.info(f"Zbieranie danych o licznikach dla {len(printers)} drukarek...")
-        
-        for printer in printers:
-            ip = printer['ip']
-            if not ip: continue
-            
+    for printer in printers:
+        ip = printer['ip']
+        if not ip: continue
+        try:
             logging.info(f"--- Przetwarzanie licznikow dla: {ip} ---")
-            base_info = await get_printer_base_info(ip, community)
+            base_info = await get_printer_base_info(ip, community, timeout=snmp_timeout,
+                                                    retries=snmp_retries, port=snmp_port)
             counter_data_row = {'ip': ip, **base_info}
             
             # Proba odczytu na żywo
             custom_oids = get_custom_oids_for_ip(config, ip)
-            web_data = get_web_data_with_selenium(driver, ip)
+            web_data = web_data_map.get(ip)
             
             if web_data and web_data != 'offline':
                 if not web_data.get('name'): web_data['name'] = base_info.get('name')
@@ -788,7 +875,9 @@ async def report_counters(force_email=False, ip_to_test=None):
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'), custom_oids)
+                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'),
+                                                        custom_oids, timeout=snmp_timeout,
+                                                        retries=snmp_retries, port=snmp_port)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 else:
@@ -815,10 +904,9 @@ async def report_counters(force_email=False, ip_to_test=None):
                             counter_data_row.update({'name': 'BŁĄD ODCZYTU', 'status': 'ERROR', 'comment': 'Brak danych w bazie'})
 
             all_counters_data.append(counter_data_row)
-            
-    finally:
-        if driver:
-            driver.quit()
+        except Exception as e:
+            logging.error(f"[{ip}] Nieoczekiwany blad przetwarzania licznikow: {e}", exc_info=True)
+            continue
 
     if all_counters_data:
         # Zapisz tylko aktualne dane do historii
@@ -874,6 +962,11 @@ def create_excel_report(report_data, filename):
     df.to_excel(filename, index=False, engine='openpyxl')
     logging.info(f"Raport Excel zapisany do: {filename}")
     return filename
+
+def _esc(value):
+    """Escaping HTML dla danych pochodzacych z urzadzen (W6)."""
+    return html.escape(str(value if value is not None else ''))
+
 
 def create_html_report(report_data, today_str, report_type="Toner", alert_level="low"):
     is_toner_report = report_type == "Toner"
@@ -931,13 +1024,28 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
         html += f"<tr class='{row_class}'>"
 
         if is_toner_report:
-            html += f"<td>{data.get('ip', '')}</td><td>{data.get('location', '')}</td><td>{data.get('name', '')}</td><td>{data.get('model', '')}</td><td>{data.get('desc', '')}</td><td><b>{data.get('level', 0.0):.1f}%</b></td>"
+            html += (f"<td>{_esc(data.get('ip', ''))}</td>"
+                     f"<td>{_esc(data.get('location', ''))}</td>"
+                     f"<td>{_esc(data.get('name', ''))}</td>"
+                     f"<td>{_esc(data.get('model', ''))}</td>"
+                     f"<td>{_esc(data.get('desc', ''))}</td>"
+                     f"<td><b>{data.get('level', 0.0):.1f}%</b></td>")
         else:
             if data.get('status') in ['OFFLINE', 'ERROR']:
-                html += f"<td class='offline-error' colspan='{len(headers)}'>Drukarka {data.get('ip')} - {data.get('name')} ({data.get('comment', '')})</td>"
+                html += (f"<td class='offline-error' colspan='{len(headers)}'>"
+                         f"Drukarka {_esc(data.get('ip'))} - {_esc(data.get('name'))} "
+                         f"({_esc(data.get('comment', ''))})</td>")
             else:
-                comment = f"<br><small><i>{data['comment']}</i></small>" if data.get('comment') else ""
-                html += f"<td>{data.get('ip', '')}</td><td>{data.get('location', 'Brak')}</td><td>{data.get('name', 'Brak')}</td><td>{data.get('model', 'Brak')}</td><td>{data.get('color', 'N/A')}</td><td>{data.get('bw', 'N/A')}</td><td>{data.get('sum', 'N/A')}</td><td>{data.get('comment', '')}</td>"
+                comment = (f"<br><small><i>{_esc(data['comment'])}</i></small>"
+                           if data.get('comment') else "")
+                html += (f"<td>{_esc(data.get('ip', ''))}</td>"
+                         f"<td>{_esc(data.get('location', 'Brak'))}</td>"
+                         f"<td>{_esc(data.get('name', 'Brak'))}</td>"
+                         f"<td>{_esc(data.get('model', 'Brak'))}</td>"
+                         f"<td>{_esc(data.get('color', 'N/A'))}</td>"
+                         f"<td>{_esc(data.get('bw', 'N/A'))}</td>"
+                         f"<td>{_esc(data.get('sum', 'N/A'))}</td>"
+                         f"<td>{_esc(data.get('comment', ''))}</td>")
                 if isinstance(data.get('color'), int): total_color += data.get('color', 0)
                 if isinstance(data.get('bw'), int): total_bw += data.get('bw', 0)
                 if isinstance(data.get('sum'), int): total_sum += data.get('sum', 0)
@@ -972,19 +1080,19 @@ async def main():
         parser.print_help()
 
 if __name__ == "__main__":
-    LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
+    setup_logging()
 
     if not PANDAS_AVAILABLE:
         logging.warning("UWAGA: 'pandas' i 'openpyxl' nie sa zainstalowane. Raporty Excel nie beda dzialac.")
+
+    if not lockfile.acquire(LOCK_FILE, max_age_seconds=3600):
+        logging.error("Inny proces monitoringu dziala (aktywna blokada). Koniec przebiegu.")
+        sys.exit(1)
 
     try:
         asyncio.run(main())
     except Exception as e:
         logging.critical(f"Wystapil nieoczekiwany blad: {e}")
     finally:
-        if os.path.exists(LOCK_FILE):
-            try:
-                os.remove(LOCK_FILE)
-                logging.info(f"Plik blokady '{LOCK_FILE}' zostal usuniety.")
-            except OSError as e:
-                logging.error(f"Nie udalo sie usunac pliku blokady '{LOCK_FILE}': {e}")
+        lockfile.release(LOCK_FILE)
+        logging.info("Blokada zwolniona.")

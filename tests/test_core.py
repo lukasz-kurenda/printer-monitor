@@ -50,6 +50,13 @@ def test_load_printers_skips_blank_rows(tmp_path, monkeypatch):
     assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
 
 
+def test_load_printers_skips_invalid_ip(tmp_path, monkeypatch):
+    pfile = tmp_path / "printers.csv"
+    pfile.write_text("192.0.2.1\nnot-an-ip\n10.0.0.999\n192.0.2.2\n")
+    monkeypatch.setattr(main, "PRINTERS_FILE", str(pfile))
+    assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
+
+
 def test_load_printers_missing_file(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "PRINTERS_FILE", str(tmp_path / "nope.csv"))
     assert main.load_printers() == []
@@ -65,10 +72,10 @@ def test_get_custom_oids_for_ip():
 # --- Poziomy tonerow (SNMP) ---
 
 def test_toner_levels_percentage_mode(monkeypatch):
-    async def fake_walk(ip, community, oid):
+    async def fake_walk(ip, community, oid, **kw):
         return {"1": "Toner Black", "2": "Toner Cyan"}
 
-    async def fake_get(ip, oids, community):
+    async def fake_get(ip, oids, community, **kw):
         out = {}
         for oid in oids:
             idx = oid.rsplit(".", 1)[-1]
@@ -88,10 +95,10 @@ def test_toner_levels_percentage_mode(monkeypatch):
 
 
 def test_toner_levels_max_mode(monkeypatch):
-    async def fake_walk(ip, community, oid):
+    async def fake_walk(ip, community, oid, **kw):
         return {"1": "Toner Black"}
 
-    async def fake_get(ip, oids, community):
+    async def fake_get(ip, oids, community, **kw):
         out = {}
         for oid in oids:
             if oid.endswith(".9.1"):
@@ -108,10 +115,10 @@ def test_toner_levels_max_mode(monkeypatch):
 
 
 def test_toner_levels_special_values(monkeypatch):
-    async def fake_walk(ip, community, oid):
+    async def fake_walk(ip, community, oid, **kw):
         return {"1": "Toner Black", "2": "Toner New"}
 
-    async def fake_get(ip, oids, community):
+    async def fake_get(ip, oids, community, **kw):
         out = {}
         for oid in oids:
             idx = oid.rsplit(".", 1)[-1]
@@ -134,7 +141,7 @@ def test_toner_levels_special_values(monkeypatch):
 # --- Liczniki stron (SNMP, FIX-K2) ---
 
 def test_counters_custom_oids(monkeypatch):
-    async def fake_get(ip, oids, community):
+    async def fake_get(ip, oids, community, **kw):
         return {oids[0]: "12", oids[1]: "34"}
 
     monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
@@ -144,7 +151,7 @@ def test_counters_custom_oids(monkeypatch):
 
 
 def test_counters_custom_oids_both_missing(monkeypatch):
-    async def fake_get(ip, oids, community):
+    async def fake_get(ip, oids, community, **kw):
         return {}
 
     monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
@@ -153,7 +160,7 @@ def test_counters_custom_oids_both_missing(monkeypatch):
 
 
 def test_counters_fallback_total(monkeypatch):
-    async def fake_get(ip, oids, community):
+    async def fake_get(ip, oids, community, **kw):
         return {"1.3.6.1.2.1.43.10.2.1.4.1.1": "5000"}
 
     monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
@@ -169,6 +176,27 @@ def test_create_html_report_toner():
     assert "Niski poziom tonerów" in html
     assert "192.0.2.1" in html
     assert "12.0%" in html
+
+
+def test_create_html_report_escapes_data():
+    data = [{"ip": "192.0.2.1", "location": "<script>alert(1)</script>",
+             "name": "<b>P1</b>", "model": "M & M", "desc": "Toner <img src=x>",
+             "level": 12.0}]
+    html = main.create_html_report(data, "2026-08-12", "Toner", "low")
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+    assert "<b>P1</b>" not in html
+    assert "&lt;img src=x&gt;" in html
+
+
+def test_create_html_report_escapes_counters():
+    data = [{"ip": "192.0.2.1", "location": "A", "name": "<i>P1</i>", "model": "M",
+             "color": 10, "bw": 20, "sum": 30, "status": "OK",
+             "comment": "x <script>"}]
+    html = main.create_html_report(data, "2026-08-12", "Counters")
+    assert "<i>P1</i>" not in html
+    assert "&lt;i&gt;P1&lt;/i&gt;" in html
+    assert "<script>" not in html
 
 
 def test_create_html_report_counters_summary():
@@ -208,3 +236,88 @@ def test_exclude_keywords_filtering():
     exclude = [kw.strip().lower() for kw in config.get("MONITORING", "toner_exclude_keywords").split(",")]
     assert any(kw in "Waste Toner Box".lower() for kw in exclude)
     assert not any(kw in "Toner Black".lower() for kw in exclude)
+
+
+# --- Parametry SNMP z configu (ENV-W8) ---
+
+def test_snmp_timeout_retries_port_wired(monkeypatch):
+    captured = {}
+
+    class FakeTarget:
+        def __init__(self, addr, timeout, retries):
+            captured["addr"] = addr
+            captured["timeout"] = timeout
+            captured["retries"] = retries
+
+        @classmethod
+        async def create(cls, addr, timeout, retries):
+            return cls(addr, timeout, retries)
+
+    monkeypatch.setattr(main, "UdpTransportTarget", FakeTarget)
+    asyncio.run(main.get_snmp_data_async(
+        "192.0.2.1", ["1.3.6.1.2.1.1.5.0"], "public", timeout=7, retries=3, port=1161))
+    assert captured["timeout"] == 7
+    assert captured["retries"] == 3
+    assert captured["addr"] == ("192.0.2.1", 1161)
+
+
+# --- W10: znacznik alertu tylko po udanej wysylce ---
+
+def _alert_config():
+    cfg = configparser.ConfigParser()
+    cfg.read_dict({
+        "MONITORING": {
+            "snmp_community": "public",
+            "toner_threshold_low": "20",
+            "toner_threshold_critical": "5",
+            "toner_exclude_keywords": "waste",
+            "alert_cooldown_days": "3",
+            "snmp_timeout": "5",
+            "snmp_retries": "2",
+            "snmp_port": "161",
+            "web_workers": "3",
+        }
+    })
+    return cfg
+
+
+def _patch_check_toner(monkeypatch, send_result):
+    calls = {"timestamps": 0}
+
+    async def _base(ip, community, **kw):
+        return {"model": "M", "name": "N", "location": "L"}
+
+    async def _toners(ip, community, config, custom_oids):
+        return [{"desc": "Toner Black", "level": 3.0, "status": "normal"}]
+
+    async def _counters(*args, **kw):
+        return None
+
+    def _spy(alerts):
+        calls["timestamps"] += 1
+
+    monkeypatch.setattr(main, "load_config", _alert_config)
+    monkeypatch.setattr(main, "load_printers", lambda: [{"ip": "192.0.2.1"}])
+    monkeypatch.setattr(main, "scrape_all_with_selenium", lambda ips, config: {})
+    monkeypatch.setattr(main, "get_printer_base_info", _base)
+    monkeypatch.setattr(main, "get_toner_levels_snmp", _toners)
+    monkeypatch.setattr(main, "get_counters_snmp", _counters)
+    monkeypatch.setattr(main, "get_last_alert_timestamp", lambda ip, desc: None)
+    monkeypatch.setattr(main, "send_email_notification", lambda *a, **k: send_result)
+    monkeypatch.setattr(main, "update_alert_timestamp", _spy)
+    monkeypatch.setattr(main, "update_toner_status_in_db", lambda d: None)
+    monkeypatch.setattr(main, "save_counter_history", lambda d: None)
+    monkeypatch.setattr(main, "log_script_run", lambda t: None)
+    return calls
+
+
+def test_alert_timestamp_not_set_when_send_fails(monkeypatch):
+    calls = _patch_check_toner(monkeypatch, send_result=False)
+    asyncio.run(main.check_toner_and_counters(force_email=True))
+    assert calls["timestamps"] == 0
+
+
+def test_alert_timestamp_set_after_successful_send(monkeypatch):
+    calls = _patch_check_toner(monkeypatch, send_result=True)
+    asyncio.run(main.check_toner_and_counters(force_email=True))
+    assert calls["timestamps"] == 1
