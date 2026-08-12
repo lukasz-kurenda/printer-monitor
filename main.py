@@ -14,7 +14,6 @@ import logging.handlers
 import asyncio
 import socket
 import sys
-import time
 import os
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
@@ -44,7 +43,6 @@ from pysnmp.hlapi.asyncio import (
     SnmpEngine, CommunityData, UdpTransportTarget,
     ContextData, ObjectType, ObjectIdentity, get_cmd, next_cmd
 )
-from pysnmp.error import PySnmpError
 
 # --- Konfiguracja ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1036,8 +1034,6 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
                          f"Drukarka {_esc(data.get('ip'))} - {_esc(data.get('name'))} "
                          f"({_esc(data.get('comment', ''))})</td>")
             else:
-                comment = (f"<br><small><i>{_esc(data['comment'])}</i></small>"
-                           if data.get('comment') else "")
                 html += (f"<td>{_esc(data.get('ip', ''))}</td>"
                          f"<td>{_esc(data.get('location', 'Brak'))}</td>"
                          f"<td>{_esc(data.get('name', 'Brak'))}</td>"
