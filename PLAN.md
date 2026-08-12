@@ -218,3 +218,13 @@ Sprint z PLAN (MUST 1-7 + SHOULD): **ALL DONE** — FIX-K2 (0b19d82), SEC-K1 (09
 - **Rollback**: snapshot `prnt-mon:rollback-20260812` (docker commit)
 - **Post-deploy smoke**: /login 200 ✅ | main.py --check-toner EXIT=0 25s, 2 podsumowania, 12xSNMP ✅ | gunicorn.log bez bledow ✅
 - **[DEPLOY_LOG] deploy 2026-08-12 23:5x | wersja: main @ f7e5f39+ (lokalnie) | smoke PASS | rollback: prnt-mon:rollback-20260812**
+
+### [/60 Learn] 2026-08-12
+- HiveMemory: decision 5619e567 (pipeline /30-/55, push gated /70), lesson (pysnmp 7 agent API), lesson (docker: bind/proxy, pkill, -B, NET_ADMIN), tool (RFC3805 OID-y) — **[LEARN_LOG] 4 wpisy**
+
+### [/65 Docs] 2026-08-12
+- README.md: struktura zaktualizowana (lockfile, simulator, tests, reports, login.html)
+- CHANGELOG.md: utworzony (1.1.0 audyt/utwardzenie, 1.0.0 sprzed)
+- API docs: [SKIPPED] — brak swagger/openapi (aplikacja bez publicznego API)
+- Mermaid (PLAN.md): zwalidowane skladniowo
+- **[DOCS_UPDATE] README+CHANGELOG zaktualizowane; spójnosc z kodem zweryfikowana**

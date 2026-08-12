@@ -39,17 +39,25 @@ Projekt został zaprojektowany z myślą o elastyczności i łatwej rozbudowie.
 
 ```
 .
-├── .gitignore          # Plik ignorujący niepotrzebne pliki w repozytorium
-├── config.ini          # Główny plik konfiguracyjny (należy go utworzyć z config.ini.example)
-├── dashboard.py        # Aplikacja webowa Flask (backend dashboardu)
-├── encrypt_util.py     # Narzędzie do szyfrowania hasła SMTP
-├── main.py             # Główny skrypt do zbierania danych
-├── printers.csv        # Lista adresów IP drukarek do monitorowania tonerów
+├── .gitignore          # Plik ignorujący sekrety, DB, logi, artefakty
+├── config.ini          # Główny plik konfiguracyjny (lokalny, gitignored; wzorzec: config.ini.example)
+├── config.ini.example  # Szablon konfiguracji (committed)
+├── dashboard.py        # Aplikacja webowa Flask (auth token + CSRF, SEC-K3)
+├── encrypt_util.py     # Narzędzie do szyfrowania hasła SMTP (Fernet)
+├── lockfile.py         # Blokada uruchomień (PID + ts + stale-lock, W5)
+├── main.py             # Główny skrypt do zbierania danych (SNMP + Selenium)
+├── printers.csv        # Lista adresów IP drukarek do monitorowania tonerów (testowa: simulator/rotate.py write-csv)
 ├── printers_counters.csv # Lista adresów IP drukarek do raportów liczników
 ├── printers.db         # Baza danych SQLite (tworzona automatycznie)
+├── requirements.txt    # Zależności (floors/caps)
+├── pytest.ini          # Konfiguracja pytest (pythonpath)
 ├── README.md           # Ta dokumentacja
+├── reports/            # Raporty: security audit, session digest, pip-audit
+├── simulator/          # Symulator floty drukarek (test fixture, patrz simulator/README.md)
+├── tests/              # Testy jednostkowe (38): rdzeń, dashboard (auth/CSRF), lockfile
 └── templates/
-    └── index.html      # Szablon HTML dla dashboardu
+    ├── index.html      # Szablon dashboardu (z CSRF meta + logout)
+    └── login.html      # Strona logowania tokenem
 ```
 
 ## Instalacja i wdrożenie
