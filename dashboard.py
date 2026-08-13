@@ -264,7 +264,7 @@ def index():
         else:
             final_printer_list.append({
                 'ip': ip, 'model': 'No data', 'name': 'Waiting for data...',
-                'location': 'N/A', 'toners': [], 'last_updated': 'Nigdy'
+                'location': 'N/A', 'toners': [], 'last_updated': 'Never'
             })
     
     try:
