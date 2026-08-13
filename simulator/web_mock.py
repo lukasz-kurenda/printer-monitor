@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""HTTP mock stron drukarek dla web scrapingu (Selenium).
+"""HTTP mock of printer pages for web scraping (Selenium).
 
-Serwuje strone zgodna z layoutem realnych urzadzen:
+Serves pages matching the layout of real devices:
 - /?MAIN=DEVICE          -> frameset z ramka TopLevelFrame
 - /top                   -> frameset z ramka contents
 - /contents?MAIN=DEVICE  -> <div id="DeviceName">, <div id="DeviceLocation">
 - /contents?MAIN=COUNTER -> <td id="TotalFullColor">, <td id="TotalBlackColor">
 
-Stan offline: serwuje strone BEZ ramek -> Selenium timeout -> sciezka 'offline'.
+Offline state: serves a page WITHOUT frames -> Selenium timeout -> the 'offline' path.
 """
 
 import json

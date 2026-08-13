@@ -1,6 +1,6 @@
 #!/bin/bash
-# Cron: sprawdzanie tonerow + alerty e-mail.
-# Sciezki wzgledne - dziala niezaleznie od katalogu wywolania.
+# Cron: toner check + e-mail alerts.
+# Relative paths - works regardless of the invocation directory.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 mkdir -p "$LOG_DIR"
@@ -10,6 +10,6 @@ if [ ! -x "$PYTHON" ]; then
     PYTHON="python3"
 fi
 
-echo "$(date): check_toners.sh uruchomiony przez cron" >> "${LOG_DIR}/printer-monitor.log"
+echo "$(date): check_toners.sh run by cron" >> "${LOG_DIR}/printer-monitor.log"
 cd "$SCRIPT_DIR"
 "$PYTHON" main.py --check-toner --force-toner-email >> "${LOG_DIR}/cron.log" 2>&1

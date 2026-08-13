@@ -31,7 +31,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
-# Import dla raportow Excel
+# Imports for Excel reports
 try:
     import pandas as pd
     PANDAS_AVAILABLE = True
@@ -55,7 +55,7 @@ WEB_WORKERS_DEFAULT = 3
 
 
 def setup_logging():
-    """Logowanie do konsoli + rotujacy plik (SHOULD: rotacja logow)."""
+    """Console logging + rotating file (SHOULD: log rotation)."""
     fmt = '%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -82,7 +82,7 @@ def setup_logging():
 
 # --- Funkcje Bazy Danych ---
 def init_db():
-    """Inicjalizuje baze danych i tworzy/aktualizuje tabele."""
+    """Initialize the database and create/update tables."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
@@ -132,12 +132,12 @@ def init_db():
 
         con.commit()
         con.close()
-        logging.info(f"Baza danych '{DB_FILE}' zostala zainicjalizowana/zaktualizowana.")
+        logging.info(f"Database '{DB_FILE}' initialized/updated.")
     except Exception as e:
-        logging.error(f"Nie udalo sie zainicjalizowac bazy danych: {e}")
+        logging.error(f"Failed to initialize the database: {e}")
 
 def log_script_run(run_type):
-    """Zapisuje znacznik czasu ostatniego uruchomienia skryptu."""
+    """Record the timestamp of the last script run."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
@@ -145,12 +145,12 @@ def log_script_run(run_type):
         cur.execute('INSERT INTO script_runs (run_type, run_timestamp) VALUES (?, ?)', (run_type, now))
         con.commit()
         con.close()
-        logging.info(f"Zanotowano uruchomienie skryptu: {run_type} o {now}")
+        logging.info(f"Recorded script run: {run_type} at {now}")
     except Exception as e:
-        logging.error(f"Nie udalo sie zapisac informacji o uruchomieniu skryptu: {e}")
+        logging.error(f"Failed to record script run info: {e}")
 
 def update_toner_status_in_db(toner_data):
-    """Zapisuje lub aktualizuje status tonera w bazie danych."""
+    """Save or update toner status in the database."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
@@ -172,12 +172,12 @@ def update_toner_status_in_db(toner_data):
             ))
         con.commit()
         con.close()
-        logging.info(f"Zaktualizowano {len(toner_data)} wpisow o tonerach w bazie danych.")
+        logging.info(f"Updated {len(toner_data)} toner entries in the database.")
     except Exception as e:
-        logging.error(f"Nie udalo sie zaktualizowac danych w bazie: {e}")
+        logging.error(f"Failed to update data in the database: {e}")
 
 def update_alert_timestamp(alerts):
-    """Aktualizuje znacznik czasu wyslania alertu dla podanych tonerow."""
+    """Update the alert-sent timestamp for the given toners."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
@@ -188,12 +188,12 @@ def update_alert_timestamp(alerts):
             ''', (now, alert.get('ip'), alert.get('desc')))
         con.commit()
         con.close()
-        logging.info(f"Zaktualizowano znaczniki czasu wyslania alertu dla {len(alerts)} tonerow.")
+        logging.info(f"Updated alert-sent timestamps for {len(alerts)} toners.")
     except Exception as e:
-        logging.error(f"Nie udalo sie zaktualizowac znacznikow czasu alertow w bazie: {e}")
+        logging.error(f"Failed to update alert timestamps in the database: {e}")
 
 def get_last_alert_timestamp(ip, desc):
-    """Pobiera date ostatniego alertu dla danego tonera."""
+    """Get the last alert date for the given toner."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
@@ -203,11 +203,11 @@ def get_last_alert_timestamp(ip, desc):
         if result and result[0]:
             return datetime.fromisoformat(result[0])
     except Exception as e:
-        logging.error(f"Blad odczytu znacznika czasu alertu z bazy: {e}")
+        logging.error(f"Error reading alert timestamp from the database: {e}")
     return None
 
 def save_counter_history(counters_data):
-    """Zapisuje historie licznikow do bazy danych."""
+    """Save counter history to the database."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
@@ -231,15 +231,15 @@ def save_counter_history(counters_data):
                 ))
         con.commit()
         con.close()
-        logging.info(f"Zapisano historie licznikow dla {len(counters_data)} drukarek.")
+        logging.info(f"Saved counter history for {len(counters_data)} printers.")
     except Exception as e:
-        logging.error(f"Nie udalo sie zapisac historii licznikow w bazie: {e}")
+        logging.error(f"Failed to save counter history in the database: {e}")
 
 def get_last_known_counter(ip):
-    """Pobiera ostatni zapisany stan licznika dla danego IP."""
+    """Get the last known counter state for the given IP."""
     try:
         con = sqlite3.connect(DB_FILE)
-        con.row_factory = sqlite3.Row # Umożliwia dostęp do kolumn po nazwie
+        con.row_factory = sqlite3.Row # Enables column access by name
         cur = con.cursor()
         cur.execute('''
             SELECT * FROM counter_history 
@@ -251,7 +251,7 @@ def get_last_known_counter(ip):
         con.close()
         return result
     except Exception as e:
-        logging.error(f"Blad odczytu historii licznikow dla {ip}: {e}")
+        logging.error(f"Error reading counter history for {ip}: {e}")
     return None
 
 # --- Funkcje pomocnicze i konfiguracyjne ---
@@ -260,12 +260,12 @@ def load_config():
     try:
         config.read(CONFIG_FILE, encoding='utf-8')
     except UnicodeDecodeError:
-        logging.warning("Nie udalo sie odczytac config.ini jako UTF-8. Probuje z 'windows-1250'...")
+        logging.warning("Failed to read config.ini as UTF-8. Trying 'windows-1250'...")
         config.read(CONFIG_FILE, encoding='windows-1250')
     return config
 
 def load_printers():
-    """Wczytuje drukarki do monitorowania tonerow i wyswietlania na dashboardzie."""
+    """Load printers for toner monitoring and dashboard display."""
     printers = []
     try:
         with open(PRINTERS_FILE, mode='r', encoding='utf-8') as infile:
@@ -276,15 +276,15 @@ def load_printers():
                     try:
                         ipaddress.ip_address(candidate)
                     except ValueError:
-                        logging.warning(f"Pominięto niepoprawny adres IP w {PRINTERS_FILE}: {candidate}")
+                        logging.warning(f"Skipped invalid IP address in {PRINTERS_FILE}: {candidate}")
                         continue
                     printers.append({'ip': candidate})
     except FileNotFoundError:
-        logging.error(f"KRYTYCZNY BLAD: Nie znaleziono pliku '{PRINTERS_FILE}'!")
+        logging.error(f"CRITICAL ERROR: file '{PRINTERS_FILE}' not found!")
     return printers
 
 def load_printers_for_counters():
-    """Wczytuje drukarki do raportow licznikow."""
+    """Load printers for counter reports."""
     printers = []
     try:
         with open(PRINTERS_COUNTERS_FILE, mode='r', encoding='utf-8') as infile:
@@ -295,32 +295,32 @@ def load_printers_for_counters():
                     try:
                         ipaddress.ip_address(candidate)
                     except ValueError:
-                        logging.warning(f"Pominięto niepoprawny adres IP w {PRINTERS_COUNTERS_FILE}: {candidate}")
+                        logging.warning(f"Skipped invalid IP address in {PRINTERS_COUNTERS_FILE}: {candidate}")
                         continue
                     printers.append({'ip': candidate})
     except FileNotFoundError:
-        logging.warning(f"Plik '{PRINTERS_COUNTERS_FILE}' nie istnieje. Raport licznikow nie zostanie wygenerowany.")
+        logging.warning(f"File '{PRINTERS_COUNTERS_FILE}' does not exist. The counter report will not be generated.")
     return printers
 
 def get_custom_oids_for_ip(config, ip):
     section_name = f"CUSTOM_OIDS:{ip}"
     if config.has_section(section_name):
-        logging.info(f"[{ip}] Znaleziono niestandardowa konfiguracje OID.")
+        logging.info(f"[{ip}] Custom OID configuration found.")
         return dict(config.items(section_name))
     return {}
 
 def send_email_notification(subject, html_body, config, recipient_key, attachment_path=None, priority=None):
-    logging.info(f"Proba wyslania powiadomienia email (klucz: {recipient_key}, priorytet: {priority})")
+    logging.info(f"Attempting to send e-mail notification (key: {recipient_key}, priority: {priority})")
     smtp_config = config['SMTP']
     sender_email = smtp_config.get('sender_email')
     receiver_emails_str = config['EMAILS'].get(recipient_key)
 
     if not receiver_emails_str:
-        logging.warning(f"Brak adresatow dla klucza '{recipient_key}'. Email nie zostanie wyslany.")
+        logging.warning(f"No recipients for key '{recipient_key}'. E-mail will not be sent.")
         return False
 
     receiver_emails = [email.strip() for email in receiver_emails_str.split(',')]
-    logging.info(f"Adresaci: {', '.join(receiver_emails)}")
+    logging.info(f"Recipients: {', '.join(receiver_emails)}")
 
     message = MIMEMultipart("alternative")
     message["From"] = sender_email
@@ -340,9 +340,9 @@ def send_email_notification(subject, html_body, config, recipient_key, attachmen
                 part = MIMEApplication(attachment.read(), Name=os.path.basename(attachment_path))
             part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
             message.attach(part)
-            logging.info(f"Zalaczono plik: {attachment_path}")
+            logging.info(f"Attached file: {attachment_path}")
         except Exception as e:
-            logging.error(f"Nie udalo sie dolaczyc pliku: {e}")
+            logging.error(f"Failed to attach file: {e}")
             return False
 
     try:
@@ -352,25 +352,25 @@ def send_email_notification(subject, html_body, config, recipient_key, attachmen
 
         f = Fernet(key)
 
-        # Odczytaj zaszyfrowane hasło z config.ini
+        # Read the encrypted password from config.ini
         encrypted_password = smtp_config.get('password')
         if not encrypted_password:
-            raise ValueError("Brak hasła w pliku konfiguracyjnym.")
+            raise ValueError("No password in the configuration file.")
 
-        # Odszyfruj hasło
+        # Decrypt the password
         decrypted_password = f.decrypt(encrypted_password.encode('utf-8')).decode('utf-8')
 
     except FileNotFoundError:
-        logging.critical("KRYTYCZNY BŁĄD: Nie znaleziono pliku klucza 'secret.key'! Nie można wysłać e-maila.")
+        logging.critical("CRITICAL ERROR: key file 'secret.key' not found! Cannot send e-mail.")
         return False
     except Exception as e:
-        logging.critical(f"KRYTYCZNY BŁĄD: Nie udało się odszyfrować hasła. Błąd: {e}. Sprawdź poprawność klucza i hasła w config.ini.")
+        logging.critical(f"CRITICAL ERROR: failed to decrypt the password. Error: {e}. Check the key and password in config.ini.")
         return False
 
     try:
         server_address = smtp_config.get('server')
         port = int(smtp_config.get('port'))
-        logging.info(f"Laczenie z serwerem SMTP: {server_address}:{port}")
+        logging.info(f"Connecting to SMTP server: {server_address}:{port}")
 
         server = smtplib.SMTP(server_address, port, timeout=15)
 
@@ -382,23 +382,23 @@ def send_email_notification(subject, html_body, config, recipient_key, attachmen
 
         server.send_message(message)
         server.quit()
-        logging.info(f"Wiadomosc email '{subject}' zostala wyslana pomyslenie.")
+        logging.info(f"E-mail '{subject}' sent successfully.")
         return True
     except socket.timeout:
-        logging.error("Timeout podczas laczenia z serwerem SMTP.")
+        logging.error("Timeout while connecting to the SMTP server.")
     except Exception as e:
-        logging.error(f"Blad podczas wysylania maila: {e}", exc_info=True)
+        logging.error(f"Error while sending e-mail: {e}", exc_info=True)
     return False
 
 def print_alert_summary(alert_level, alerts):
-    """Wyświetla podsumowanie alertów w terminalu."""
+    """Print an alert summary to the terminal."""
     if not alerts:
         return
         
     print(f"\n{'='*60}")
-    print(f"  PODSUMOWANIE ALERTÓW - POZIOM {alert_level}")
+    print(f"  ALERT SUMMARY - LEVEL {alert_level}")
     print(f"{'='*60}")
-    print(f"Liczba alertów: {len(alerts)}")
+    print(f"Number of alerts: {len(alerts)}")
     print("-" * 60)
     
     for alert in alerts:
@@ -408,9 +408,9 @@ def print_alert_summary(alert_level, alerts):
         desc = alert.get('desc', 'N/A')
         level = alert.get('level', 0)
         
-        print(f"• {ip} | {location}")
+        print(f"- {ip} | {location}")
         print(f"  {name}")
-        print(f"  Toner: {desc} - Poziom: {level:.1f}%")
+        print(f"  Toner: {desc} - Level: {level:.1f}%")
         print("-" * 60)
     
     print(f"{'='*60}\n")
@@ -446,9 +446,9 @@ async def get_snmp_data_async(ip, oids, community, timeout=5, retries=1, port=16
 async def get_printer_base_info(ip, community, timeout=5, retries=1, port=161):
     oids = ['1.3.6.1.2.1.25.3.2.1.3.1', '1.3.6.1.2.1.1.5.0', '1.3.6.1.2.1.1.6.0']
     data = await get_snmp_data_async(ip, oids, community, timeout=timeout, retries=retries, port=port)
-    model = data.get('1.3.6.1.2.1.25.3.2.1.3.1', "Nie odczytano")
-    name = data.get('1.3.6.1.2.1.1.5.0', "Brak")
-    location = data.get('1.3.6.1.2.1.1.6.0', "Brak")
+    model = data.get('1.3.6.1.2.1.25.3.2.1.3.1', "Not read")
+    name = data.get('1.3.6.1.2.1.1.5.0', "None")
+    location = data.get('1.3.6.1.2.1.1.6.0', "None")
     return {'model': model, 'name': name, 'location': location}
 
 async def walk_snmp_oid(ip, community, oid, timeout=10, retries=2, port=161):
@@ -469,17 +469,17 @@ async def walk_snmp_oid(ip, community, oid, timeout=10, retries=2, port=161):
             results[index] = str(current_val)
             var_binds = [var_binds] 
         except Exception as e:
-            logging.error(f"[{ip}] Blad podczas 'walk' SNMP dla OID {oid}: {e}")
+            logging.error(f"[{ip}] Error during SNMP 'walk' for OID {oid}: {e}")
             break
     return results
 
 async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
     """
-    Pobiera poziomy tonerów dla drukarki, optymalizując liczbę zapytań SNMP.
-    1. Odkrywa wszystkie materiały eksploatacyjne za pomocą SNMP walk.
-    2. Zbiera OIDy dla poziomu bieżącego i maksymalnego wszystkich materiałów.
-    3. Wysyła jedno zbiorcze zapytanie SNMP get, aby pobrać wszystkie dane naraz.
-    4. Przetwarza wyniki i zwraca listę tonerów z ich poziomami.
+    Fetch toner levels for a printer, optimizing the number of SNMP requests.
+    1. Discover all consumables via an SNMP walk.
+    2. Collect OIDs for current and maximum levels of all consumables.
+    3. Send a single bulk SNMP get to fetch all data at once.
+    4. Process the results and return a list of toners with their levels.
     """
     toners = []
     oid_map = custom_oids if custom_oids and custom_oids.get('desc') else {
@@ -496,15 +496,15 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
     if not base_desc_oid:
         return []
 
-    # 1. Odkryj materiały przez SNMP walk
+    # 1. Discover consumables via an SNMP walk
     discovered_supplies = await walk_snmp_oid(ip, community, base_desc_oid,
                                               timeout=snmp_timeout, retries=snmp_retries,
                                               port=snmp_port)
     if not discovered_supplies:
-        logging.warning(f"[{ip}] Nie znaleziono materialow przez 'walk' dla OID: {base_desc_oid}")
+        logging.warning(f"[{ip}] No consumables found by 'walk' for OID: {base_desc_oid}")
         return []
 
-    # 2. Przygotuj listy OIDów do zbiorczego zapytania
+    # 2. Prepare OID lists for the bulk request
     oids_to_fetch = []
     supply_details = {}
     value_is_percentage = oid_map.get('value_is_percentage', 'false').lower() == 'true'
@@ -520,13 +520,13 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
 
         supply_details[index] = {'desc': desc, 'current_oid': current_oid, 'max_oid': max_oid}
 
-    # 3. Wyślij jedno zbiorcze zapytanie SNMP
-    logging.info(f"[{ip}] Odpytuje o {len(oids_to_fetch)} OIDow dla {len(discovered_supplies)} materialow...")
+    # 3. Send a single bulk SNMP request
+    logging.info(f"[{ip}] Fetching {len(oids_to_fetch)} OIDs for {len(discovered_supplies)} consumables...")
     all_levels_data = await get_snmp_data_async(ip, oids_to_fetch, community,
                                                 timeout=snmp_timeout, retries=snmp_retries,
                                                 port=snmp_port)
 
-    # 4. Przetwórz otrzymane dane
+    # 4. Process the received data
     for index, details in supply_details.items():
         try:
             desc = details['desc']
@@ -534,7 +534,7 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
             current_level_str = all_levels_data.get(current_oid)
 
             if current_level_str is None or current_level_str == '':
-                logging.warning(f"[{ip}] Otrzymano pusta wartosc dla '{desc}'. Pomijam.")
+                logging.warning(f"[{ip}] Empty value received for '{desc}'. Skipping.")
                 continue
 
             current_level = int(current_level_str)
@@ -558,14 +558,14 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
                 elif max_level > 0 and current_level >= 0:
                     toner_data['level'] = min((current_level / max_level) * 100, 100.0)
                 else:
-                    continue  # Pomiń, jeśli dane są nieprawidłowe
+                    continue  # Skip if the data is invalid
 
             toners.append(toner_data)
         except (ValueError, TypeError, ZeroDivisionError) as e:
-            logging.warning(f"[{ip}] Nie mozna przetworzyc danych dla '{details['desc']}'. Blad: {e}")
+            logging.warning(f"[{ip}] Cannot process data for '{details['desc']}'. Error: {e}")
             continue
 
-    logging.info(f"[{ip}] Przetworzono dane dla {len(toners)} tonerow.")
+    logging.info(f"[{ip}] Processed data for {len(toners)} toners.")
     return toners
 
 # --- FUNKCJE DLA LICZNIKOW ---
@@ -583,22 +583,22 @@ def init_selenium_driver(config):
         chrome_options.add_argument('--blink-settings=imagesEnabled=false')
         chrome_options.set_capability('acceptInsecureCerts', True)
         driver = webdriver.Chrome(options=chrome_options)
-        logging.info("Sterownik Selenium zostal uruchomiony.")
+        logging.info("Selenium driver started.")
         return driver
     except Exception as e:
-        logging.error(f"Nie udalo sie zainicjalizowac sterownika Selenium: {e}")
+        logging.error(f"Failed to initialize the Selenium driver: {e}")
         return None
 
 
 async def get_counters_snmp(ip, community, model_name="", custom_oids=None,
                             timeout=5, retries=1, port=161):
     """
-    Odczytuje liczniki stron przez SNMP.
-    Jeśli zdefiniowano niestandardowe OID-y dla liczników, używa ich.
-    W przeciwnym razie, używa ogólnego OID-a dla sumy stron jako fallback.
+    Reads page counters over SNMP.
+    If custom OIDs are defined for counters, they are used.
+    Otherwise, a generic total-pages OID is used as a fallback.
     """
     if custom_oids and custom_oids.get('oid_color_count') and custom_oids.get('oid_bw_count'):
-        logging.info(f"[{ip}] Używam niestandardowych OID-ów do odczytu liczników stron.")
+        logging.info(f"[{ip}] Using custom OIDs to read page counters.")
         color_oid = custom_oids.get('oid_color_count')
         bw_oid = custom_oids.get('oid_bw_count')
         data = await get_snmp_data_async(ip, [color_oid, bw_oid], community,
@@ -609,17 +609,17 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None,
 
         try:
             if color_count_str is None and bw_count_str is None:
-                logging.warning(f"[{ip}] Niestandardowe OID-y liczników nie zwróciły żadnych wartości.")
+                logging.warning(f"[{ip}] Custom counter OIDs returned no values.")
                 return None
 
             color_count = int(color_count_str) if color_count_str is not None else 0
             bw_count = int(bw_count_str) if bw_count_str is not None else 0
             return {'color': color_count, 'bw': bw_count, 'sum': color_count + bw_count, 'status': 'OK'}
         except (ValueError, TypeError) as e:
-            logging.warning(f"[{ip}] Nie udało się przetworzyć niestandardowych wartości liczników SNMP. Sprawdź OID-y. Błąd: {e}")
+            logging.warning(f"[{ip}] Failed to process custom SNMP counter values. Check the OIDs. Error: {e}")
             return None
 
-    logging.info(f"[{ip}] Uzywam ogolnej metody SNMP do odczytu sumy licznikow (Fallback).")
+    logging.info(f"[{ip}] Using the generic SNMP method to read the total counter (fallback).")
     total_oid = '1.3.6.1.2.1.43.10.2.1.4.1.1'
     total_data = await get_snmp_data_async(ip, [total_oid], community,
                                            timeout=timeout, retries=retries, port=port)
@@ -627,20 +627,20 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None,
     if total_count:
         try:
             total = int(total_count)
-            # Assume total is black & white if color is not specified
+            # Assume the total is black & white if color is not specified
             return {'color': 0, 'bw': total, 'sum': total, 'status': 'OK'}
         except (ValueError, TypeError):
-            logging.warning(f"[{ip}] Nie udalo sie przetworzyc sumy licznika SNMP.")
+            logging.warning(f"[{ip}] Failed to process the SNMP total counter.")
     return None
 
 def get_web_data_with_selenium(driver, ip_address):
-    """Pobiera dane przez HTTP, używając WebDriverWait dla większej stabilności."""
+    """Fetch data over HTTP, using WebDriverWait for greater stability."""
     try:
-        logging.info(f"[{ip_address}] Rozpoczynam próbę web scrapingu przez HTTP...")
+        logging.info(f"[{ip_address}] Starting web scraping over HTTP...")
         web_data = {'status': 'OK'}
         wait = WebDriverWait(driver, 25)
 
-        # Pobierz informacje o urządzeniu
+        # Fetch device information
         driver.get(f"http://{ip_address}/?MAIN=DEVICE")
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
@@ -652,7 +652,7 @@ def get_web_data_with_selenium(driver, ip_address):
         if location_tag: web_data['location'] = location_tag.get_text(strip=True)
         driver.switch_to.default_content()
 
-        # Pobierz informacje o licznikach
+        # Fetch counter information
         driver.get(f"http://{ip_address}/?MAIN=COUNTER&SUB=TOTAL")
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
@@ -665,27 +665,27 @@ def get_web_data_with_selenium(driver, ip_address):
         driver.switch_to.default_content()
 
         if web_data.get('color') is None or web_data.get('bw') is None:
-             logging.warning(f"[{ip_address}] Połączono, ale nie znaleziono elementów licznika na stronie.")
+             logging.warning(f"[{ip_address}] Connected, but no counter elements found on the page.")
              return None
         
-        logging.info(f"[{ip_address}] Web scraping zakończony sukcesem.")
+        logging.info(f"[{ip_address}] Web scraping completed successfully.")
         return web_data
 
     except (TimeoutException, WebDriverException) as e:
-        logging.warning(f"[{ip_address}] Web scraping nie powiódł się: {type(e).__name__}")
+        logging.warning(f"[{ip_address}] Web scraping failed: {type(e).__name__}")
         driver.switch_to.default_content()
         return 'offline'
     except Exception as e:
-        logging.error(f"[{ip_address}] Niespodziewany błąd podczas web scrapingu: {e}", exc_info=True)
+        logging.error(f"[{ip_address}] Unexpected error during web scraping: {e}", exc_info=True)
         driver.switch_to.default_content()
         return None
 
-# --- GŁÓWNE FUNKCJE ZADAŃ ---
+# --- MAIN TASK FUNCTIONS ---
 
 def scrape_all_with_selenium(ips, config, max_workers=None):
-    """Web scraping wielu drukarek rownolegle (osobny driver Chromium na watek).
+    """Web-scrape multiple printers in parallel (one Chromium driver per thread).
 
-    Zwraca {ip: wynik} - wynik jak z get_web_data_with_selenium (dict/'offline'/None).
+    Returns {ip: result} - result as from get_web_data_with_selenium (dict/'offline'/None).
     """
     if max_workers is None:
         max_workers = config.getint('MONITORING', 'web_workers', fallback=WEB_WORKERS_DEFAULT)
@@ -694,7 +694,7 @@ def scrape_all_with_selenium(ips, config, max_workers=None):
     def _scrape_one(ip):
         driver = init_selenium_driver(config)
         if not driver:
-            logging.error(f"[{ip}] Nie udalo sie zainicjalizowac sterownika Selenium.")
+            logging.error(f"[{ip}] Failed to initialize the Selenium driver.")
             return ip, None
         try:
             return ip, get_web_data_with_selenium(driver, ip)
@@ -708,10 +708,10 @@ def scrape_all_with_selenium(ips, config, max_workers=None):
 
 
 async def check_toner_and_counters(force_email=False, ip_to_test=None):
-    """ZINTEGROWANA funkcja do sprawdzania tonerow i licznikow."""
+    """INTEGRATED function for checking toners and counters."""
     config = load_config()
     printers = [{'ip': ip_to_test}] if ip_to_test else load_printers()
-    if ip_to_test: logging.info(f"Test dla pojedynczej drukarki: {ip_to_test}")
+    if ip_to_test: logging.info(f"Testing a single printer: {ip_to_test}")
 
     community = config.get('MONITORING', 'snmp_community', fallback='public')
     threshold_low = config.getint('MONITORING', 'toner_threshold_low', fallback=20)
@@ -728,10 +728,10 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     snmp_port = config.getint('MONITORING', 'snmp_port', fallback=161)
 
     if not printers:
-        logging.warning("Brak drukarek w printers.csv. Zatrzymuje sprawdzanie.")
+        logging.warning("No printers in printers.csv. Stopping the check.")
         return
 
-    logging.info(f"Sprawdzanie tonerow i licznikow dla {len(printers)} drukarek...")
+    logging.info(f"Checking toners and counters for {len(printers)} printers...")
     ip_list = [p['ip'] for p in printers if p.get('ip')]
     web_data_map = scrape_all_with_selenium(ip_list, config)
 
@@ -739,16 +739,16 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
         ip = printer['ip']
         if not ip: continue
         try:
-            logging.info(f"--- Przetwarzanie drukarki: {ip} ---")
+            logging.info(f"--- Processing printer: {ip} ---")
             base_info = await get_printer_base_info(ip, community, timeout=snmp_timeout,
                                                     retries=snmp_retries, port=snmp_port)
             
-            # --- Zbieranie danych o tonerach ---
+            # --- Collecting toner data ---
             custom_oids = get_custom_oids_for_ip(config, ip)
             toners = await get_toner_levels_snmp(ip, community, config, custom_oids)
             
             if not toners:
-                logging.warning(f"Brak danych o tonerach z {ip}.")
+                logging.warning(f"No toner data from {ip}.")
             else:
                 for toner in toners:
                     toner_db_entry = {'ip': ip, **base_info, **toner}
@@ -773,10 +773,10 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                         elif level <= threshold_critical: critical_toner_alerts.append(alert_base)
                         elif level <= threshold_low: low_toner_alerts.append(alert_base)
                     elif status == 'low' or level <= threshold_low:
-                        logging.info(f"[{ip}] Alert dla '{toner.get('desc')}' jest w okresie blokady. Pomijam wysylke email.")
+                        logging.info(f"[{ip}] Alert for '{toner.get('desc')}' is in cooldown. Skipping e-mail.")
             
-            # --- Zbieranie danych o licznikach ---
-            logging.info(f"[{ip}] Rozpoczynam odczyt licznikow...")
+            # --- Collecting counter data ---
+            logging.info(f"[{ip}] Starting counter read...")
             counter_data_row = {'ip': ip, **base_info}
             web_data = web_data_map.get(ip)
             
@@ -792,12 +792,12 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
                 elif web_data == 'offline':
-                    counter_data_row.update({'name': 'DRUKARKA OFFLINE (TIMEOUT)', 'status': 'OFFLINE'})
+                    counter_data_row.update({'name': 'PRINTER OFFLINE (TIMEOUT)', 'status': 'OFFLINE'})
                 else:
-                    counter_data_row.update({'name': 'WYSTAPIL BLAD ODCZYTU', 'status': 'ERROR'})
+                    counter_data_row.update({'name': 'READ ERROR OCCURRED', 'status': 'ERROR'})
             all_counters_data.append(counter_data_row)
         except Exception as e:
-            logging.error(f"[{ip}] Nieoczekiwany blad przetwarzania drukarki: {e}", exc_info=True)
+            logging.error(f"[{ip}] Unexpected error while processing printer: {e}", exc_info=True)
             continue
 
     if all_toners_data_for_db: update_toner_status_in_db(all_toners_data_for_db)
@@ -806,7 +806,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     today = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     if critical_toner_alerts:
-        subject = f"[PILNE] Krytyczny poziom tonerow ({len(critical_toner_alerts)} alertow)"
+        subject = f"[URGENT] Critical toner level ({len(critical_toner_alerts)} alerts)"
         html_body = create_html_report(critical_toner_alerts, today, "Toner", "critical")
         print_alert_summary("KRYTYCZNY", critical_toner_alerts)
         if force_email:
@@ -815,7 +815,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 update_alert_timestamp(critical_toner_alerts)
     
     if low_toner_alerts:
-        subject = f"[UWAGA] Niski poziom tonerow ({len(low_toner_alerts)} alertow)"
+        subject = f"[WARNING] Low toner level ({len(low_toner_alerts)} alerts)"
         html_body = create_html_report(low_toner_alerts, today, "Toner", "low")
         print_alert_summary("NISKI", low_toner_alerts)
         if force_email:
@@ -824,25 +824,25 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
                 update_alert_timestamp(low_toner_alerts)
 
     if not critical_toner_alerts and not low_toner_alerts:
-        logging.info("✓ Nie wykryto nowych alertow tonerowych wymagajacych powiadomienia.")
+        logging.info("No new toner alerts requiring notification detected.")
     
     log_script_run('toner_check')
 
 async def report_counters(force_email=False, ip_to_test=None):
     """
-    Zbiera dane o licznikach, generuje raporty (HTML, Excel)
-    i opcjonalnie wysyla je mailem. W przypadku braku odpowiedzi od drukarki,
-    uzywa ostatniego znanego stanu z bazy danych.
+    Collects counter data, generates reports (HTML, Excel)
+    and optionally sends them by e-mail. If a printer does not respond,
+    the last known state from the database is used.
     """
     config = load_config()
-    # Użyj nowej funkcji do wczytania drukarek do raportu
+    # Use the new function to load printers for the report
     printers = [{'ip': ip_to_test}] if ip_to_test else load_printers_for_counters()
     if not printers:
-        logging.warning("Brak drukarek w pliku printers_counters.csv. Zatrzymuje generowanie raportu.")
+        logging.warning("No printers in printers_counters.csv. Stopping the report generation.")
         return
 
     if ip_to_test:
-        logging.info(f"Test raportu licznikow dla pojedynczej drukarki: {ip_to_test}")
+        logging.info(f"Testing the counter report for a single printer: {ip_to_test}")
 
     community = config.get('MONITORING', 'snmp_community', fallback='public')
     snmp_timeout = config.getint('MONITORING', 'snmp_timeout', fallback=5)
@@ -850,7 +850,7 @@ async def report_counters(force_email=False, ip_to_test=None):
     snmp_port = config.getint('MONITORING', 'snmp_port', fallback=161)
     all_counters_data = []
 
-    logging.info(f"Zbieranie danych o licznikach dla {len(printers)} drukarek...")
+    logging.info(f"Collecting counter data for {len(printers)} printers...")
     ip_list = [p['ip'] for p in printers if p.get('ip')]
     web_data_map = scrape_all_with_selenium(ip_list, config)
 
@@ -858,12 +858,12 @@ async def report_counters(force_email=False, ip_to_test=None):
         ip = printer['ip']
         if not ip: continue
         try:
-            logging.info(f"--- Przetwarzanie licznikow dla: {ip} ---")
+            logging.info(f"--- Processing counters for: {ip} ---")
             base_info = await get_printer_base_info(ip, community, timeout=snmp_timeout,
                                                     retries=snmp_retries, port=snmp_port)
             counter_data_row = {'ip': ip, **base_info}
             
-            # Proba odczytu na żywo
+            # Attempt a live read
             custom_oids = get_custom_oids_for_ip(config, ip)
             web_data = web_data_map.get(ip)
             
@@ -880,7 +880,7 @@ async def report_counters(force_email=False, ip_to_test=None):
                     counter_data_row.update(snmp_counters)
                 else:
                     # ---- NOWA LOGIKA FALLBACKU ----
-                    logging.warning(f"[{ip}] Drukarka nie odpowiada. Szukam ostatnich danych w bazie...")
+                    logging.warning(f"[{ip}] Printer not responding. Looking for the last known data in the database...")
                     last_known = get_last_known_counter(ip)
                     if last_known:
                         last_date = last_known['report_date']
@@ -892,18 +892,18 @@ async def report_counters(force_email=False, ip_to_test=None):
                             'bw': last_known['bw_count'],
                             'sum': last_known['total_count'],
                             'status': 'HISTORY',
-                            'comment': f"OFFLINE - dane z {last_date}"
+                            'comment': f"OFFLINE - data from {last_date}"
                         })
-                        logging.info(f"[{ip}] Znaleziono dane historyczne z dnia {last_date}.")
+                        logging.info(f"[{ip}] Historical data found from {last_date}.")
                     else:
                         if web_data == 'offline':
-                            counter_data_row.update({'name': 'DRUKARKA OFFLINE', 'status': 'OFFLINE', 'comment': 'Brak danych w bazie'})
+                            counter_data_row.update({'name': 'PRINTER OFFLINE', 'status': 'OFFLINE', 'comment': 'No data in database'})
                         else:
-                            counter_data_row.update({'name': 'BŁĄD ODCZYTU', 'status': 'ERROR', 'comment': 'Brak danych w bazie'})
+                            counter_data_row.update({'name': 'READ ERROR', 'status': 'ERROR', 'comment': 'No data in database'})
 
             all_counters_data.append(counter_data_row)
         except Exception as e:
-            logging.error(f"[{ip}] Nieoczekiwany blad przetwarzania licznikow: {e}", exc_info=True)
+            logging.error(f"[{ip}] Unexpected error while processing counters: {e}", exc_info=True)
             continue
 
     if all_counters_data:
@@ -912,18 +912,18 @@ async def report_counters(force_email=False, ip_to_test=None):
         if current_data_to_save:
             save_counter_history(current_data_to_save)
         
-        logging.info(f"Zebrano dane dla {len(all_counters_data)} licznikow (w tym historyczne).")
+        logging.info(f"Collected data for {len(all_counters_data)} counters (including historical).")
 
         if force_email:
-            logging.info("Wymuszono wyslanie raportu licznikow e-mailem.")
+            logging.info("Forced sending the counter report by e-mail.")
             today_str = datetime.now().strftime("%Y-%m-%d")
             
             html_body = create_html_report(all_counters_data, today_str, report_type="Counters")
-            excel_filename = f"Raport_Licznikow_{today_str}.xlsx"
+            excel_filename = f"Counter_Report_{today_str}.xlsx"
             excel_filepath = os.path.join(BASE_DIR, excel_filename)
             attachment_path = create_excel_report(all_counters_data, excel_filepath)
 
-            subject = f"Raport liczników drukarek z dnia {today_str}"
+            subject = f"Printer counter report for {today_str}"
             send_email_notification(
                 subject, html_body, config, 'recipient_email_counters',
                 attachment_path=attachment_path
@@ -933,52 +933,52 @@ async def report_counters(force_email=False, ip_to_test=None):
                  os.remove(attachment_path)
                  logging.info(f"Usunieto tymczasowy plik raportu: {attachment_path}")
         else:
-            logging.info("Dane licznikow zostaly zebrane. Uzyj opcji --force-counters-email, aby wyslac raport.")
+            logging.info("Counter data collected. Use --force-counters-email to send the report.")
     else:
-        logging.warning("Nie udalo sie zebrac zadnych danych o licznikach.")
+        logging.warning("Failed to collect any counter data.")
         
     log_script_run('counters_report')
 
 def create_excel_report(report_data, filename):
     if not PANDAS_AVAILABLE: return None
     df_data = []
-    # Usunięto filtrowanie - teraz wszystkie dane trafiają do raportu
+    # Filtering removed - now all data goes into the report
     for d in report_data:
         df_data.append({
-            'Adres IP': d.get('ip'),
-            'Lokalizacja': d.get('location'),
-            'Nazwa': d.get('name'),
+            'IP address': d.get('ip'),
+            'Location': d.get('location'),
+            'Name': d.get('name'),
             'Model': d.get('model'),
-            'Licznik Kolor': d.get('color'),
-            'Licznik B&W': d.get('bw'),
-            'Suma': d.get('sum'),
-            'Uwagi': d.get('comment', '') # Nowa kolumna na uwagi
+            'Color counter': d.get('color'),
+            'B&W counter': d.get('bw'),
+            'Total': d.get('sum'),
+            'Notes': d.get('comment', '') # New column for notes
         })
     df = pd.DataFrame(df_data)
-    # Definiowanie kolejności kolumn
-    df = df[['Adres IP', 'Lokalizacja', 'Nazwa', 'Model', 'Licznik Kolor', 'Licznik B&W', 'Suma', 'Uwagi']]
+    # Define the column order
+    df = df[['IP address', 'Location', 'Name', 'Model', 'Color counter', 'B&W counter', 'Total', 'Notes']]
     df.to_excel(filename, index=False, engine='openpyxl')
-    logging.info(f"Raport Excel zapisany do: {filename}")
+    logging.info(f"Excel report saved to: {filename}")
     return filename
 
 def _esc(value):
-    """Escaping HTML dla danych pochodzacych z urzadzen (W6)."""
+    """HTML escaping for device-provided data (W6)."""
     return html.escape(str(value if value is not None else ''))
 
 
 def create_html_report(report_data, today_str, report_type="Toner", alert_level="low"):
     is_toner_report = report_type == "Toner"
     
-    # ... (początek funkcji bez zmian)
+    # ... (start of the function unchanged)
     if is_toner_report:
         if alert_level == 'critical':
-            title = "PILNE: Krytyczny poziom tonerów"
-            message = "<p style='text-align:center; font-size:14px;'>Wymagana jest <b>natychmiastowa wymiana</b> poniższych materiałów eksploatacyjnych!</p>"
+            title = "URGENT: Critical toner level"
+            message = "<p style='text-align:center; font-size:14px;'>The following consumables require <b>immediate replacement</b>!</p>"
         else: # low
-            title = "UWAGA: Niski poziom tonerów"
-            message = "<p style='text-align:center; font-size:14px;'>Proszę zweryfikować stany magazynowe, a następnie zamówić wymienione materiały.</p>"
+            title = "WARNING: Low toner level"
+            message = "<p style='text-align:center; font-size:14px;'>Please check the stock levels and order the listed consumables.</p>"
     else:
-        title = "Raport liczników drukarek"
+        title = "Printer counter report"
         message = ""
 
     html = f"""
@@ -1005,7 +1005,7 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
     <table><tr>
     """
     
-    headers = ['IP', 'Lokalizacja', 'Nazwa', 'Model', 'Nazwa Tonera', 'Poziom %'] if is_toner_report else ['IP', 'Lokalizacja', 'Nazwa', 'Model', 'Kolor', 'B&W', 'Suma', 'Uwagi']
+    headers = ['IP', 'Location', 'Name', 'Model', 'Toner name', 'Level %'] if is_toner_report else ['IP', 'Location', 'Name', 'Model', 'Color', 'B&W', 'Total', 'Notes']
     for header in headers: html += f"<th>{header}</th>"
     html += "</tr>"
     total_color, total_bw, total_sum = 0, 0, 0
@@ -1047,48 +1047,48 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
                 if isinstance(data.get('sum'), int): total_sum += data.get('sum', 0)
         html += "</tr>"
     if not is_toner_report:
-        html += f"<tr class='summary'><td colspan='4' style='text-align:right;'>SUMA:</td><td>{total_color}</td><td>{total_bw}</td><td>{total_sum}</td><td></td></tr>"
+        html += f"<tr class='summary'><td colspan='4' style='text-align:right;'>TOTAL:</td><td>{total_color}</td><td>{total_bw}</td><td>{total_sum}</td><td></td></tr>"
     html += "</table></body></html>"
     return html
 
 # --- Glowna logika programu ---
 async def main():
-    parser = argparse.ArgumentParser(description="Monitorowanie Drukarek.")
-    parser.add_argument('--check-toner', action='store_true', help='Sprawdza poziom tonerow i zapisuje alerty.')
-    parser.add_argument('--force-toner-email', action='store_true', help='Wymusza wyslanie alertu o tonerach (uzywac z --check-toner).')
+    parser = argparse.ArgumentParser(description="Printer Monitoring.")
+    parser.add_argument('--check-toner', action='store_true', help='Checks toner levels and records alerts.')
+    parser.add_argument('--force-toner-email', action='store_true', help='Forces toner alert e-mails (use with --check-toner).')
     
-    parser.add_argument('--report-counters', action='store_true', help='Zbiera dane o licznikach i generuje raport.')
-    parser.add_argument('--force-counters-email', action='store_true', help='Wysyla wygenerowany raport licznikow e-mailem (uzywac z --report-counters).')
+    parser.add_argument('--report-counters', action='store_true', help='Collects counter data and generates a report.')
+    parser.add_argument('--force-counters-email', action='store_true', help='Sends the generated counter report by e-mail (use with --report-counters).')
 
-    parser.add_argument('--ip', '-i', type=str, help='Sprawdza tylko jedna drukarke o podanym IP.')
+    parser.add_argument('--ip', '-i', type=str, help='Checks only a single printer with the given IP.')
     args = parser.parse_args()
     
     init_db() 
 
     if args.check_toner:
-        # Uruchamia tylko sprawdzanie tonerow i zintegrowane zbieranie danych
+        # Run only the toner check with integrated data collection
         await check_toner_and_counters(args.force_toner_email, args.ip)
     elif args.report_counters:
-        # Uruchamia dedykowana funkcje do raportowania licznikow
+        # Run the dedicated counter reporting function
         await report_counters(args.force_counters_email, args.ip)
     else:
-        print("Wybierz jedna z opcji: --check-toner lub --report-counters.")
+        print("Choose one of the options: --check-toner or --report-counters.")
         parser.print_help()
 
 if __name__ == "__main__":
     setup_logging()
 
     if not PANDAS_AVAILABLE:
-        logging.warning("UWAGA: 'pandas' i 'openpyxl' nie sa zainstalowane. Raporty Excel nie beda dzialac.")
+        logging.warning("WARNING: 'pandas' and 'openpyxl' are not installed. Excel reports will not work.")
 
     if not lockfile.acquire(LOCK_FILE, max_age_seconds=3600):
-        logging.error("Inny proces monitoringu dziala (aktywna blokada). Koniec przebiegu.")
+        logging.error("Another monitoring process is running (active lock). Ending this run.")
         sys.exit(1)
 
     try:
         asyncio.run(main())
     except Exception as e:
-        logging.critical(f"Wystapil nieoczekiwany blad: {e}")
+        logging.critical(f"An unexpected error occurred: {e}")
     finally:
         lockfile.release(LOCK_FILE)
-        logging.info("Blokada zwolniona.")
+        logging.info("Lock released.")

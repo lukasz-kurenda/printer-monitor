@@ -41,7 +41,7 @@ def test_load_config_missing_file_returns_empty(tmp_path, monkeypatch):
     assert not config.sections()
 
 
-# --- Listy drukarek ---
+# --- Printer lists ---
 
 def test_load_printers_skips_blank_rows(tmp_path, monkeypatch):
     pfile = tmp_path / "printers.csv"
@@ -69,7 +69,7 @@ def test_get_custom_oids_for_ip():
     assert main.get_custom_oids_for_ip(config, "192.0.2.11") == {}
 
 
-# --- Poziomy tonerow (SNMP) ---
+# --- Toner levels (SNMP) ---
 
 def test_toner_levels_percentage_mode(monkeypatch):
     async def fake_walk(ip, community, oid, **kw):
@@ -173,7 +173,7 @@ def test_counters_fallback_total(monkeypatch):
 def test_create_html_report_toner():
     data = [{"ip": "192.0.2.1", "location": "A", "name": "P1", "model": "M", "desc": "Toner Black", "level": 12.0}]
     html = main.create_html_report(data, "2026-08-12", "Toner", "low")
-    assert "Niski poziom tonerów" in html
+    assert "WARNING: Low toner level" in html
     assert "192.0.2.1" in html
     assert "12.0%" in html
 
@@ -203,7 +203,7 @@ def test_create_html_report_counters_summary():
     data = [{"ip": "192.0.2.1", "location": "A", "name": "P1", "model": "M",
              "color": 10, "bw": 20, "sum": 30, "status": "OK"}]
     html = main.create_html_report(data, "2026-08-12", "Counters")
-    assert "SUMA:" in html
+    assert "TOTAL:" in html
     assert "10" in html and "20" in html and "30" in html
 
 
@@ -229,7 +229,7 @@ def test_alert_timestamp_roundtrip(tmp_path, monkeypatch):
     assert main.get_last_alert_timestamp("192.0.2.1", "Toner Cyan") is None
 
 
-# --- Wykluczenia materiałów ---
+# --- Consumable exclusions ---
 
 def test_exclude_keywords_filtering():
     config = _monitoring_config()

@@ -2,10 +2,10 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="author" content="Łukasz Kurenda">
+    <meta name="author" content="Lukasz Kurenda">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>Dashboard Drukarek</title>
+    <title>Printer Dashboard</title>
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -147,16 +147,16 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Stan tonerów w drukarkach</h1>
-            <p>Dane aktualizowane są automatycznie co 8 godzin (0:00, 8:00, 16:00)</p>
+            <h1>Printer toner levels</h1>
+            <p>Data is updated automatically every 8 hours (00:00, 08:00, 16:00)</p>
         </div>
         
         <div class="controls">
-            <button id="updateBtn" class="btn btn-secondary">Aktualizuj stan tonerów w drukarkach</button>
-            <button id="reportBtn" class="btn btn-primary">Generuj raport liczników z drukarek</button>
+            <button id="updateBtn" class="btn btn-secondary">Update toner levels</button>
+            <button id="reportBtn" class="btn btn-primary">Generate counter report</button>
             <form method="post" action="/logout" style="display:inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button type="submit" class="btn btn-secondary">Wyloguj</button>
+                <button type="submit" class="btn btn-secondary">Log out</button>
             </form>
         </div>
 
@@ -165,16 +165,16 @@
             <div class="card">
                 <div class="card-header">
                     <h3>{{ printer.name }}</h3>
-                    <span class="location">Lokalizacja: {{ printer.location or 'Brak' }} | IP: {{ printer.ip }}</span>
+                    <span class="location">Location: {{ printer.location or 'N/A' }} | IP: {{ printer.ip }}</span>
                 </div>
                 <div class="card-body">
                     {% for toner in printer.toners %}
                     <div class="toner-item">
                         <div class="toner-desc">
                             {% if toner.level is not none and toner.level <= 1 %}
-                                <span class="icon critical" title="Poziom krytyczny!">&#9888;</span>
+                                <span class="icon critical" title="Critical level!">&#9888;</span>
                             {% elif toner.level is not none and toner.level <= 5 %}
-                                <span class="icon warning" title="Niski poziom">&#9888;</span>
+                                <span class="icon warning" title="Low level">&#9888;</span>
                             {% endif %}
                             {{ toner.desc.split(' S/N:')[0] }}
                         </div>
@@ -192,15 +192,15 @@
                         </div>
                     </div>
                     {% else %}
-                        <p style="text-align: center; color: #6c757d;">Brak danych. Oczekiwanie na dane...</p>
+                        <p style="text-align: center; color: #6c757d;">No data yet. Waiting for data...</p>
                     {% endfor %}
                 </div>
                 <div class="card-footer">
-                    Ostatnia aktualizacja: {{ printer.last_updated }}
+                    Last update: {{ printer.last_updated }}
                 </div>
             </div>
             {% else %}
-                <p style="text-align: center; grid-column: 1 / -1;">Brak drukarek w pliku printers.csv</p>
+                <p style="text-align: center; grid-column: 1 / -1;">No printers in printers.csv</p>
             {% endfor %}
         </div>
     </div>
@@ -208,8 +208,8 @@
     <div id="notification" class="notification"></div>
     
     <footer class="footer">
-        <p>Dashboard monitoringu drukarek</p>
-        <p>Stworzone przez: Łukasz Kurenda</p> 
+        <p>Printer monitoring dashboard</p>
+        <p>Created by: Lukasz Kurenda</p> 
     </footer>
 
     <script>
@@ -245,7 +245,7 @@
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        showNotification('Wystapil blad polaczenia z serwerem.', true);
+                        showNotification('Connection to the server failed.', true);
                     })
                     .finally(() => {
                         setTimeout(() => {

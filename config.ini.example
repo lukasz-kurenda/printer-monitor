@@ -1,4 +1,4 @@
-# ===== config.ini.example — skopiuj do config.ini i wypelnij =====
+# ===== config.ini.example — copy to config.ini and fill in =====
 [SMTP]
 server = SMTP_SERVER
 port = 587

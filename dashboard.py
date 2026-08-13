@@ -27,7 +27,7 @@ app = Flask(__name__)
 
 
 def setup_logging():
-    """Logowanie do konsoli + rotujacy plik (SHOULD: rotacja logow)."""
+    """Console logging + rotating file (SHOULD: log rotation)."""
     fmt = '%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -51,14 +51,14 @@ def setup_logging():
 setup_logging()
 
 
-# --- Autoryzacja (SEC-K3) ---
-# Token pobierany z env DASH_AUTH_TOKEN lub [WWW] auth_token w config.ini.
-# Bez skonfigurowanego tokenu dashboard zwraca 503 (fail-closed).
+# --- Authentication (SEC-K3) ---
+# Token read from env DASH_AUTH_TOKEN or [WWW] auth_token in config.ini.
+# Without a configured token the dashboard returns 503 (fail-closed).
 #
-# Tryb AUTO_LOGIN ([WWW] auto_login = true / env DASH_AUTO_LOGIN=true):
-# autoryzacja odbywa sie automatycznie (bez podawania tokenu) - dopuszczalne
-# TYLKO gdy dashboard jest dostepny lokalnie (docker -p 127.0.0.1:5001:5001).
-# CSRF na POST pozostaje aktywny w obu trybach.
+# AUTO_LOGIN mode ([WWW] auto_login = true / env DASH_AUTO_LOGIN=true):
+# authentication happens automatically (no token prompt) - allowed
+# ONLY when the dashboard is available locally (docker -p 127.0.0.1:5001:5001).
+# CSRF on POST stays active in both modes.
 
 def load_auth_token():
     token = os.environ.get('DASH_AUTH_TOKEN')
@@ -96,14 +96,14 @@ app.permanent_session_lifetime = timedelta(days=30)
 
 @app.before_request
 def require_auth_and_csrf():
-    session.permanent = True  # sesja cookie 30 dni - token podawany rzadko
+    session.permanent = True  # 30-day cookie session - token rarely needed
     if AUTO_LOGIN:
         if not session.get('authenticated'):
             session['authenticated'] = True
             session['csrf_token'] = secrets.token_hex(16)
     elif not AUTH_TOKEN:
-        return ("Blad: brak tokenu autoryzacji. Ustaw DASH_AUTH_TOKEN (env) "
-                "lub auth_token w sekcji [WWW] config.ini.", 503)
+        return ("Error: missing auth token. Set DASH_AUTH_TOKEN (env) "
+                "or auth_token in the [WWW] section of config.ini.", 503)
     elif not session.get('authenticated'):
         if request.endpoint in ('login', 'static'):
             return None
@@ -113,7 +113,7 @@ def require_auth_and_csrf():
     if request.method == 'POST':
         csrf = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
         if not csrf or csrf != session.get('csrf_token'):
-            return jsonify({'status': 'error', 'message': 'Nieprawidlowy token CSRF.'}), 403
+            return jsonify({'status': 'error', 'message': 'Invalid CSRF token.'}), 403
     return None
 
 
@@ -125,7 +125,7 @@ def login():
             session['authenticated'] = True
             session['csrf_token'] = secrets.token_hex(16)
             return redirect(url_for('index'))
-        return render_template('login.html', error='Nieprawidlowy token.',
+        return render_template('login.html', error='Invalid token.',
                                csrf_token=session.get('csrf_token', '')), 401
     if session.get('authenticated'):
         return redirect(url_for('index'))
@@ -140,10 +140,10 @@ def logout():
 
 # --- Funkcje pomocnicze ---
 def load_printers_from_csv():
-    """Wczytuje liste IP drukarek z pliku CSV, aby wyswietlic je wszystkie."""
+    """Load the list of printer IPs from the CSV file to display them all."""
     printers = []
     if not os.path.exists(PRINTERS_FILE):
-        logging.error(f"Plik z drukarkami '{PRINTERS_FILE}' nie istnieje!")
+        logging.error(f"Printers file '{PRINTERS_FILE}' does not exist!")
         return []
     try:
         with open(PRINTERS_FILE, mode='r', encoding='utf-8') as infile:
@@ -152,34 +152,34 @@ def load_printers_from_csv():
                 if row and row[0].strip():
                     printers.append(row[0].strip())
     except Exception as e:
-        logging.error(f"Nie udalo sie wczytac pliku {PRINTERS_FILE}: {e}")
+        logging.error(f"Failed to read file {PRINTERS_FILE}: {e}")
     return printers
 
 def get_db_connection():
-    """Nawiazuje polaczenie z baza danych SQLite."""
+    """Open a connection to the SQLite database."""
     try:
         conn = sqlite3.connect(DB_FILE)
         conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.OperationalError as e:
-        logging.error(f"Nie mozna polaczyc z baza danych '{DB_FILE}': {e}")
+        logging.error(f"Cannot connect to database '{DB_FILE}': {e}")
         return None
 
 def load_config():
-    """Wczytuje konfiguracje z pliku config.ini."""
+    """Load configuration from config.ini."""
     config = configparser.ConfigParser()
     if not os.path.exists(CONFIG_FILE):
-        logging.error(f"Plik konfiguracyjny {CONFIG_FILE} nie zostal znaleziony.")
+        logging.error(f"Configuration file {CONFIG_FILE} was not found.")
         return None
     try:
         config.read(CONFIG_FILE, encoding='utf-8')
     except Exception as e:
-        logging.error(f"Nie udalo sie odczytac pliku config.ini: {e}")
+        logging.error(f"Failed to read config.ini: {e}")
         return None
     return config
 
 def get_toner_color(description):
-    """Zwraca kolory dla paska postepu na podstawie opisu tonera."""
+    """Return progress bar colors based on the toner description."""
     desc_lower = description.lower()
     if 'black' in desc_lower or 'czarny' in desc_lower:
         return {'bg': '#343a40', 'text': '#ffffff'}
@@ -192,42 +192,42 @@ def get_toner_color(description):
     return {'bg': '#6c757d', 'text': '#ffffff'}
 
 def run_background_script(command_list, log_file):
-    """Uruchamia podane polecenie w tle w bezpieczny sposób (bez shell=True)."""
-    logging.info(f"Otrzymano zadanie uruchomienia polecenia: {' '.join(command_list)}")
+    """Run the given command in the background safely (no shell=True)."""
+    logging.info(f"Received task to run command: {' '.join(command_list)}")
     try:
         with open(log_file, "a") as log:
             subprocess.Popen(command_list, stdout=log, stderr=subprocess.STDOUT)
         
-        logging.info("Polecenie zostalo uruchomione w tle.")
-        return True, "Zlecono zadanie. Wynik pojawi się po zakończeniu."
+        logging.info("Command started in the background.")
+        return True, "Task submitted. The result will appear when it finishes."
     except Exception as e:
-        logging.error(f"Nie udało się uruchomić procesu: {e}")
-        return False, f"Wystąpił błąd serwera: {e}"
+        logging.error(f"Failed to start the process: {e}")
+        return False, f"Server error: {e}"
 
-# --- Głowne widoki aplikacji ---
-# ZNAJDŹ I ZAKTUALIZUJ FUNKCJĘ index()
+# --- Main application views ---
+# FIND AND UPDATE THE index() FUNCTION
 @app.route('/')
 @app.route('/printer-monitor')
 def index():
-    """Glowny widok dashboardu, wyswietla wszystkie drukarki z CSV."""
+    """Main dashboard view - displays all printers from the CSV."""
     all_printer_ips = load_printers_from_csv()
     conn = get_db_connection()
     config = load_config()
     db_data = []
-    last_run_time = "Nigdy" # Domyślna wartość
+    last_run_time = "Never" # Default value
 
     if not config:
-        return "Blad: Nie mozna zaladowac pliku konfiguracyjnego.", 500
+        return "Error: could not load the configuration file.", 500
 
     filter_keywords = [kw.strip().lower() for kw in config.get('MONITORING', 'toner_filter_keywords', fallback='').split(',')]
     exclude_keywords = [kw.strip().lower() for kw in config.get('MONITORING', 'toner_exclude_keywords', fallback='').split(',')]
 
     if conn:
         try:
-            # Pobierz dane tonerów
+            # Fetch toner data
             db_data = conn.execute('SELECT * FROM toner_status').fetchall()
             
-            # Pobierz datę ostatniego uruchomienia
+            # Fetch the last run timestamp
             last_run_cursor = conn.execute('SELECT run_timestamp FROM script_runs ORDER BY id DESC LIMIT 1')
             last_run_result = last_run_cursor.fetchone()
             if last_run_result:
@@ -235,7 +235,7 @@ def index():
                 
             conn.close()
         except sqlite3.OperationalError as e:
-            logging.error(f"Blad zapytania do bazy danych: {e}.")
+            logging.error(f"Database query error: {e}.")
     
     # ... (reszta funkcji bez zmian)
     db_printers = {}
@@ -263,26 +263,26 @@ def index():
             final_printer_list.append(db_printers[ip])
         else:
             final_printer_list.append({
-                'ip': ip, 'model': 'Brak danych', 'name': 'Oczekiwanie na dane...',
+                'ip': ip, 'model': 'No data', 'name': 'Waiting for data...',
                 'location': 'N/A', 'toners': [], 'last_updated': 'Nigdy'
             })
     
     try:
         final_printer_list.sort(key=lambda p: int(p['location']) if p['location'] and p['location'].isdigit() else 9999)
     except (ValueError, TypeError):
-        logging.warning("Wystapil problem przy sortowaniu numerycznym lokalizacji.")
+        logging.warning("Problem sorting locations numerically.")
     
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Przekaż nową zmienną do szablonu
+    # Pass the new variable to the template
     return render_template('index.html', printers=final_printer_list,
                            current_time=current_time, last_run_time=last_run_time,
                            csrf_token=session.get('csrf_token', ''))
 
 @app.route('/run-report-counters', methods=['POST'])
 def run_report_counters():
-    """Uruchamia w tle skrypt generujacy raport licznikow, z mechanizmem blokady."""
+    """Run the counter report script in the background, with a lock mechanism."""
     if lockfile.is_locked(LOCK_FILE, max_age_seconds=3600):
-        return jsonify({'status': 'error', 'message': 'Inny proces jest już uruchomiony. Spróbuj ponownie za chwilę.'}), 409
+        return jsonify({'status': 'error', 'message': 'Another process is already running. Try again in a moment.'}), 409
 
     try:
         python_executable = sys.executable
@@ -292,17 +292,17 @@ def run_report_counters():
         
         success, message = run_background_script(command_list, log_file)
         if success:
-            return jsonify({'status': 'success', 'message': 'Zlecono generowanie raportu. E-mail zostanie wysłany po zakończeniu.'})
+            return jsonify({'status': 'success', 'message': 'Report generation scheduled. The e-mail will be sent when it finishes.'})
         return jsonify({'status': 'error', 'message': message}), 500
     except Exception as e:
-        logging.error(f"Blad podczas uruchamiania skryptu: {e}")
-        return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
+        logging.error(f"Error while starting the script: {e}")
+        return jsonify({'status': 'error', 'message': f"Server error: {e}"}), 500
 
 @app.route('/run-check-toner', methods=['POST'])
 def run_check_toner():
-    """Uruchamia w tle skrypt sprawdzajacy stan tonerow, z mechanizmem blokady."""
+    """Run the toner check script in the background, with a lock mechanism."""
     if lockfile.is_locked(LOCK_FILE, max_age_seconds=3600):
-        return jsonify({'status': 'error', 'message': 'Inny proces jest już uruchomiony. Spróbuj ponownie za chwilę.'}), 409
+        return jsonify({'status': 'error', 'message': 'Another process is already running. Try again in a moment.'}), 409
 
     try:
         python_executable = sys.executable
@@ -312,18 +312,18 @@ def run_check_toner():
 
         success, message = run_background_script(command_list, log_file)
         if success:
-            return jsonify({'status': 'success', 'message': 'Zlecono aktualizację stanów tonerów. Odśwież stronę za chwilę.'})
+            return jsonify({'status': 'success', 'message': 'Toner update scheduled. Refresh the page in a moment.'})
         return jsonify({'status': 'error', 'message': message}), 500
     except Exception as e:
-        logging.error(f"Blad podczas uruchamiania skryptu: {e}")
-        return jsonify({'status': 'error', 'message': f"Wystąpił błąd serwera: {e}"}), 500
+        logging.error(f"Error while starting the script: {e}")
+        return jsonify({'status': 'error', 'message': f"Server error: {e}"}), 500
 
 if __name__ == '__main__':
     if not AUTH_TOKEN:
-        logging.critical("KRYTYCZNY BLAD: Brak tokenu autoryzacji (DASH_AUTH_TOKEN / [WWW] auth_token).")
+        logging.critical("CRITICAL ERROR: no auth token (DASH_AUTH_TOKEN / [WWW] auth_token).")
     if not os.path.exists(DB_FILE):
-        logging.critical(f"KRYTYCZNY BLAD: Plik bazy danych '{DB_FILE}' nie istnieje!")
-        logging.critical("Uruchom najpierw skrypt 'main.py --check-toner', aby go utworzyc.")
+        logging.critical(f"CRITICAL ERROR: database file '{DB_FILE}' does not exist!")
+        logging.critical("Run 'main.py --check-toner' first to create it.")
     else:
         app.run(host='127.0.0.1', port=5001, debug=False)
 

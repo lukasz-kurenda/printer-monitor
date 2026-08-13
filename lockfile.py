@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Mechanizm blokady uruchomien (OPS-W5): PID + znacznik czasu + stale-lock.
+"""Run lock mechanism (OPS-W5): PID + timestamp + stale-lock detection.
 
-Plik blokady (JSON): {"pid": ..., "ts": ..., "cmd": ...}
-Blokada uznawana za aktywna gdy: pid zyje ORAZ plik mlodszy niz max_age_seconds.
-Martwy PID albo stary plik = stale-lock -> mozna przejac.
+Lock file (JSON): {"pid": ..., "ts": ..., "cmd": ...}
+A lock is considered active when: the pid is alive AND the file is younger than max_age_seconds.
+A dead PID or an old file = stale-lock -> can be taken over.
 """
 
 import json
@@ -33,7 +33,7 @@ def _pid_alive(pid):
 
 
 def is_locked(lock_path, max_age_seconds=3600):
-    """True, jesli blokade trzyma zywy proces (i nie jest stara)."""
+    """True if a live process holds the lock (and it is not stale)."""
     data = _lock_data(lock_path)
     if not data:
         return False
@@ -43,7 +43,7 @@ def is_locked(lock_path, max_age_seconds=3600):
 
 
 def acquire(lock_path, max_age_seconds=3600):
-    """Probuje przejac blokade. Zwraca True (przejeto) lub False (aktywny inny)."""
+    """Try to take over the lock. Returns True (acquired) or False (another active)."""
     if is_locked(lock_path, max_age_seconds):
         return False
     data = {"pid": os.getpid(), "ts": time.time(), "cmd": "printer-monitor"}
@@ -55,7 +55,7 @@ def acquire(lock_path, max_age_seconds=3600):
 
 
 def release(lock_path):
-    """Usuwa blokade tylko jesli nalezy do biezacego procesu."""
+    """Remove the lock only if it belongs to the current process."""
     data = _lock_data(lock_path)
     if data and data.get("pid") == os.getpid():
         try:

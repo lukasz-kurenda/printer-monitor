@@ -45,7 +45,7 @@ def test_acquire_and_release(tmp_path):
     path = str(tmp_path / "script.lock")
     assert lockfile.acquire(path) is True
     assert lockfile.is_locked(path) is True
-    assert lockfile.acquire(path) is False  # zywy wlasciciel -> odmowa
+    assert lockfile.acquire(path) is False  # live owner -> denied
     lockfile.release(path)
     assert lockfile.is_locked(path) is False
 

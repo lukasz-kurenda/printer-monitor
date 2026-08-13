@@ -2,44 +2,52 @@
 
 ## [1.1.1] — 2026-08-13 — Public-readiness + UX
 
-- **Public-readiness**: skrypty cron ze ścieżkami względnymi (zamiast twardych `/home/admin/...`),
-  `SECURITY.md`, README „Szybki start" + sekcja symulatora, CI: `checkout@v5`/`setup-python@v5`/Python 3.12
-  (przywrócone do stanu zdalnego — token bez scope `workflow`)
+- **Public-readiness**: cron scripts use relative paths (instead of hardcoded `/home/admin/...`),
+  `SECURITY.md`, README "Quick start" + simulator section, CI: `checkout@v5`/`setup-python@v5`/Python 3.12
+  (reverted to remote state - token lacks `workflow` scope)
 - **Sensitive references removed**: mentions of obsolete organisation / scan patterns removed from the entire git history
-- **Autoryzacja**: tryb `AUTO_LOGIN` (`[WWW] auto_login` / `DASH_AUTO_LOGIN`) — automatyczne logowanie
-  lokalne; sesja trwała (30 dni); rozdzielenie dashboardu: `:5001` lokalny (auto-login, tylko loopback),
-  `:5002` VLAN (tryb tokenowy)
-- **Ops**: `start-services.sh` jako entrypoint kontenera — pełny auto-start usług po restarcie
-  serwera (aliasy IP, flota, SNMP agent, web mock, gunicorn)
-- **Docs**: plan projektu przeniesiony do README (sekcja „Stan projektu"), `PLAN.md` usunięty
+  (filter-repo), force-push
+- **Authentication**: `AUTO_LOGIN` mode (`[WWW] auto_login` / `DASH_AUTO_LOGIN`) - automatic
+  local login; permanent session (30 days); dashboard split: `:5001` local (auto-login,
+  loopback only), `:5002` VLAN (token mode)
+- **Ops**: `start-services.sh` as container entrypoint - full service auto-start after a
+  server restart (IP aliases, fleet, SNMP agent, web mock, gunicorn)
+- **Docs**: project plan moved to README ("Project status" section), `PLAN.md` removed,
+  whole project translated to English
 
-## [1.1.0] — 2026-08-12 — Audyt + utwardzenie (etapy /20–/55)
+## [1.1.0] — 2026-08-12 — Audit + hardening (pipeline /20–/55)
 
+### Security (SEC)
+- **SEC-K1**: secrets removed from git history (`git filter-repo`); active `.gitignore`;
+  `config.ini.example`; blob scan = 0 hits; force-push `0955c59`
+- **SEC-K3**: dashboard with authentication - token login (`DASH_AUTH_TOKEN`/`[WWW] auth_token`),
+  signed session cookie (HttpOnly, SameSite=Strict), CSRF on POST (403), fail-closed (503),
+  `debug=False`, gunicorn, local bind (`docker -p 127.0.0.1:5001:5001`)
+- Audit: gitleaks 0 / bandit 0 / pip-audit 0 (report: `reports/security/audit_20260812.md`)
 
-### Bezpieczeństwo (SEC)
-- **SEC-K1**: usunięcie sekretów z historii gita (`git filter-repo`); aktywny `.gitignore`; `config.ini.example`; skan blobów = 0 trafień; force-push `0955c59`
-- **SEC-K3**: dashboard z autoryzacją — login tokenem (`DASH_AUTH_TOKEN`/`[WWW] auth_token`), sesja signed cookie (HttpOnly, SameSite=Strict), CSRF na POST (403), fail-closed (503), `debug=False`, gunicorn, bind lokalny (`docker -p 127.0.0.1:5001:5001`)
-- Audit: gitleaks 0 / bandit 0 / pip-audit 0 (raport: `reports/security/audit_20260812.md`)
-
-### Poprawki (FIX)
-- **FIX-K2**: scalenie zduplikowanej `get_counters_snmp` (custom OID-y + fallback total); TypeError przy drukarce offline nie przerywa już przebiegu
-- Izolacja błędów per-drukarka (pętla nie umiera)
-- Walidacja adresów IP w `printers*.csv`
+### Fixes (FIX)
+- **FIX-K2**: merged duplicated `get_counters_snmp` (custom OIDs + fallback total);
+  TypeError on an offline printer no longer aborts the run
+- Per-printer error isolation (the loop no longer dies)
+- IP validation in `printers*.csv`
 
 ### Ops (W5/W6/W8/W10)
-- **W5**: `lockfile.py` — blokada PID + timestamp + wykrywanie stale-lock; koniec równoległych przebiegów (cron/dashboard), 409 na dashboardzie
-- **W6**: `html.escape` w raportach e-mail
-- **W8**: `snmp_timeout`/`snmp_retries`/`snmp_port` z configu (zamiast hardcode)
-- **W10**: znacznik czasu alertu aktualizowany tylko po udanej wysyłce SMTP
+- **W5**: `lockfile.py` - PID + timestamp lock with stale detection; no more parallel runs
+  (cron/dashboard), HTTP 409 on the dashboard
+- **W6**: `html.escape` in e-mail reports
+- **W8**: `snmp_timeout`/`snmp_retries`/`snmp_port` from config (instead of hardcode)
+- **W10**: alert timestamp updated only after a successful SMTP send
 
-### Wydajność i narzędzia
-- Web scraping równoległy (`web_workers`, osobny Chromium na wątek): 12 drukarek 65s → 25s
-- Rotacja logów: `RotatingFileHandler` (1 MB × 3) w `main.py` i `dashboard.py`
-- Testy: 38 (rdzeń 21, dashboard 9, lockfile 8); CI GitHub Actions zielone
+### Performance and tooling
+- Parallel web scraping (`web_workers`, separate Chromium per thread): 12 printers 65s -> 25s
+- Log rotation: `RotatingFileHandler` (1 MB x 3) in `main.py` and `dashboard.py`
+- Tests: 41 (core 24, dashboard 9, lockfile 8); green GitHub Actions CI
 
-### Testowanie
-- **INTEG-SIM**: symulator floty 12 fikcyjnych drukarek — SNMP agent (pysnmp 7, per-IP :161) + web mock (frameset, :80) + CLI rotacji stanów (`simulator/rotate.py`); weryfikacja e2e: alerty, liczniki, wykluczenia, offline, dashboard
+### Testing
+- **INTEG-SIM**: 12 fake printer fleet simulator - SNMP agent (pysnmp 7, per-IP :161)
+  + web mock (frameset, :80) + state rotation CLI (`simulator/rotate.py`); e2e verification:
+  alerts, counters, exclusions, offline, dashboard
 
-## [1.0.0] — 2026-08-12 — Stan sprzed audytu (repozytorium przepisane)
+## [1.0.0] — 2026-08-12 — State before the audit (history rewritten)
 
-- Pierwotna wersja aplikacji (historia oczyszczona z sekretów; commity sprzed `0955c59` niedostępne)
+- Original application version (history cleaned of secrets; commits before `0955c59` unavailable)

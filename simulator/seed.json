@@ -3,75 +3,379 @@
   "snmp_port": 161,
   "web_port": 80,
   "printers": [
-    {"ip": "172.21.0.11", "model": "HP LaserJet M428fdw", "name": "Drukarka HR - recepcja", "location": "101",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 8200},
-                {"desc": "Waste Toner Box", "max": 100, "current": 30}],
-     "counters": {"color": 0, "bw": 45210}},
-    {"ip": "172.21.0.12", "model": "HP Color LaserJet Pro M454dn", "name": "Drukarka Ksiegowosc", "location": "102",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 6400},
-                {"desc": "Toner Cyan", "max": 10000, "current": 7100},
-                {"desc": "Toner Magenta", "max": 10000, "current": 5300},
-                {"desc": "Toner Yellow", "max": 10000, "current": 8900}],
-     "counters": {"color": 18340, "bw": 32110}},
-    {"ip": "172.21.0.13", "model": "Konica Minolta bizhub C300i", "name": "Drukarka Marketing", "location": "103",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 1800},
-                {"desc": "Toner Cyan", "max": 10000, "current": 4600},
-                {"desc": "Toner Magenta", "max": 10000, "current": 3900},
-                {"desc": "Toner Yellow", "max": 10000, "current": 5100},
-                {"desc": "Waste Toner Box", "max": 100, "current": 82}],
-     "counters": {"color": 41200, "bw": 65400}},
-    {"ip": "172.21.0.14", "model": "Kyocera ECOSYS M3655idn", "name": "Drukarka Dzial kadr", "location": "104",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 9500},
-                {"desc": "Drum Unit", "max": 100000, "current": 32000},
-                {"desc": "Developer", "max": 100000, "current": 41000}],
-     "counters": {"color": 0, "bw": 129500}},
-    {"ip": "172.21.0.15", "model": "Toshiba e-STUDIO2000AC", "name": "Drukarka Sekretariat", "location": "105",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 300},
-                {"desc": "Toner Cyan", "max": 10000, "current": 2200},
-                {"desc": "Toner Magenta", "max": 10000, "current": 1800},
-                {"desc": "Toner Yellow", "max": 10000, "current": 2400},
-                {"desc": "Developer", "max": 100000, "current": 60000}],
-     "counters": {"color": 22100, "bw": 33100}},
-    {"ip": "172.21.0.16", "model": "Brother HL-L8360CDW", "name": "Drukarka IT", "location": "106",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 7700},
-                {"desc": "Toner Cyan", "max": 10000, "current": 6900},
-                {"desc": "Toner Magenta", "max": 10000, "current": 7200},
-                {"desc": "Toner Yellow", "max": 10000, "current": 6800}],
-     "counters": {"color": 9800, "bw": 15400}},
-    {"ip": "172.21.0.17", "model": "Xerox VersaLink C405", "name": "Drukarka Biuro 2", "location": "107",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 5100},
-                {"desc": "Toner Cyan", "max": 10000, "current": 4800},
-                {"desc": "Toner Magenta", "max": 10000, "current": 4900},
-                {"desc": "Toner Yellow", "max": 10000, "current": 4700},
-                {"desc": "Drum Cartridge", "max": 100, "current": 55}],
-     "counters": {"color": 6700, "bw": 8900}},
-    {"ip": "172.21.0.18", "model": "Ricoh IM C3000", "name": "Drukarka Sala konferencyjna", "location": "108",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 2600},
-                {"desc": "Toner Cyan", "max": 10000, "current": 3100},
-                {"desc": "Toner Magenta", "max": 10000, "current": 2900},
-                {"desc": "Toner Yellow", "max": 10000, "current": 3300},
-                {"desc": "Waste Toner", "max": 100, "current": 12}],
-     "counters": {"color": 11200, "bw": 14300}},
-    {"ip": "172.21.0.19", "model": "Canon imageRUNNER 1643i", "name": "Drukarka Magazyn", "location": "109",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 900}],
-     "counters": {"color": 0, "bw": 87600}},
-    {"ip": "172.21.0.20", "model": "Lexmark CX625ade", "name": "Drukarka Biuro 1", "location": "110",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 6100},
-                {"desc": "Toner Cyan", "max": 10000, "current": 5200},
-                {"desc": "Toner Magenta", "max": 10000, "current": 4400},
-                {"desc": "Toner Yellow", "max": 10000, "current": 5600}],
-     "counters": {"color": 15400, "bw": 19800}},
-    {"ip": "172.21.0.21", "model": "OKI C844dnw", "name": "Drukarka Serwerownia", "location": "111",
-     "toners": [{"desc": "Toner Black", "max": 10000, "current": 3800},
-                {"desc": "Toner Cyan", "max": 10000, "current": 3500},
-                {"desc": "Toner Magenta", "max": 10000, "current": 3600},
-                {"desc": "Toner Yellow", "max": 10000, "current": 3700}],
-     "counters": {"color": 8300, "bw": 12100}},
-    {"ip": "172.21.0.22", "model": "Epson WorkForce Pro WF-C5790", "name": "Drukarka Straznik", "location": "112",
-     "toners": [{"desc": "Black Ink", "max": 100, "current": 64},
-                {"desc": "Cyan Ink", "max": 100, "current": 58},
-                {"desc": "Magenta Ink", "max": 100, "current": 61},
-                {"desc": "Yellow Ink", "max": 100, "current": 55}],
-     "counters": {"color": 5200, "bw": 6800}}
+    {
+      "ip": "172.21.0.11",
+      "model": "HP LaserJet M428fdw",
+      "name": "HR printer - reception",
+      "location": "101",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 8200
+        },
+        {
+          "desc": "Waste Toner Box",
+          "max": 100,
+          "current": 30
+        }
+      ],
+      "counters": {
+        "color": 0,
+        "bw": 45210
+      }
+    },
+    {
+      "ip": "172.21.0.12",
+      "model": "HP Color LaserJet Pro M454dn",
+      "name": "Accounting printer",
+      "location": "102",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 6400
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 7100
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 5300
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 8900
+        }
+      ],
+      "counters": {
+        "color": 18340,
+        "bw": 32110
+      }
+    },
+    {
+      "ip": "172.21.0.13",
+      "model": "Konica Minolta bizhub C300i",
+      "name": "Marketing printer",
+      "location": "103",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 1800
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 4600
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 3900
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 5100
+        },
+        {
+          "desc": "Waste Toner Box",
+          "max": 100,
+          "current": 82
+        }
+      ],
+      "counters": {
+        "color": 41200,
+        "bw": 65400
+      }
+    },
+    {
+      "ip": "172.21.0.14",
+      "model": "Kyocera ECOSYS M3655idn",
+      "name": "HR department printer",
+      "location": "104",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 9500
+        },
+        {
+          "desc": "Drum Unit",
+          "max": 100000,
+          "current": 32000
+        },
+        {
+          "desc": "Developer",
+          "max": 100000,
+          "current": 41000
+        }
+      ],
+      "counters": {
+        "color": 0,
+        "bw": 129500
+      }
+    },
+    {
+      "ip": "172.21.0.15",
+      "model": "Toshiba e-STUDIO2000AC",
+      "name": "Secretariat printer",
+      "location": "105",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 300
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 2200
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 1800
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 2400
+        },
+        {
+          "desc": "Developer",
+          "max": 100000,
+          "current": 60000
+        }
+      ],
+      "counters": {
+        "color": 22100,
+        "bw": 33100
+      }
+    },
+    {
+      "ip": "172.21.0.16",
+      "model": "Brother HL-L8360CDW",
+      "name": "IT printer",
+      "location": "106",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 7700
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 6900
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 7200
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 6800
+        }
+      ],
+      "counters": {
+        "color": 9800,
+        "bw": 15400
+      }
+    },
+    {
+      "ip": "172.21.0.17",
+      "model": "Xerox VersaLink C405",
+      "name": "Office 2 printer",
+      "location": "107",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 5100
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 4800
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 4900
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 4700
+        },
+        {
+          "desc": "Drum Cartridge",
+          "max": 100,
+          "current": 55
+        }
+      ],
+      "counters": {
+        "color": 6700,
+        "bw": 8900
+      }
+    },
+    {
+      "ip": "172.21.0.18",
+      "model": "Ricoh IM C3000",
+      "name": "Conference room printer",
+      "location": "108",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 2600
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 3100
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 2900
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 3300
+        },
+        {
+          "desc": "Waste Toner",
+          "max": 100,
+          "current": 12
+        }
+      ],
+      "counters": {
+        "color": 11200,
+        "bw": 14300
+      }
+    },
+    {
+      "ip": "172.21.0.19",
+      "model": "Canon imageRUNNER 1643i",
+      "name": "Warehouse printer",
+      "location": "109",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 900
+        }
+      ],
+      "counters": {
+        "color": 0,
+        "bw": 87600
+      }
+    },
+    {
+      "ip": "172.21.0.20",
+      "model": "Lexmark CX625ade",
+      "name": "Office 1 printer",
+      "location": "110",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 6100
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 5200
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 4400
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 5600
+        }
+      ],
+      "counters": {
+        "color": 15400,
+        "bw": 19800
+      }
+    },
+    {
+      "ip": "172.21.0.21",
+      "model": "OKI C844dnw",
+      "name": "Server room printer",
+      "location": "111",
+      "toners": [
+        {
+          "desc": "Toner Black",
+          "max": 10000,
+          "current": 3800
+        },
+        {
+          "desc": "Toner Cyan",
+          "max": 10000,
+          "current": 3500
+        },
+        {
+          "desc": "Toner Magenta",
+          "max": 10000,
+          "current": 3600
+        },
+        {
+          "desc": "Toner Yellow",
+          "max": 10000,
+          "current": 3700
+        }
+      ],
+      "counters": {
+        "color": 8300,
+        "bw": 12100
+      }
+    },
+    {
+      "ip": "172.21.0.22",
+      "model": "Epson WorkForce Pro WF-C5790",
+      "name": "Guard printer",
+      "location": "112",
+      "toners": [
+        {
+          "desc": "Black Ink",
+          "max": 100,
+          "current": 64
+        },
+        {
+          "desc": "Cyan Ink",
+          "max": 100,
+          "current": 58
+        },
+        {
+          "desc": "Magenta Ink",
+          "max": 100,
+          "current": 61
+        },
+        {
+          "desc": "Yellow Ink",
+          "max": 100,
+          "current": 55
+        }
+      ],
+      "counters": {
+        "color": 5200,
+        "bw": 6800
+      }
+    }
   ]
 }

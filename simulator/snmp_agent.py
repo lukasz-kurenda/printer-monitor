@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""SNMP agent symulujacy flote drukarek (pysnmp 7, CommandResponder).
+"""SNMP agent simulating a fleet of printers (pysnmp 7, CommandResponder).
 
-Odpowiada na drzewie OID, ktore odpytuje main.py:
+Answers on the OID tree that main.py queries:
 - 1.3.6.1.2.1.1.5.0            sysName (nazwa)
 - 1.3.6.1.2.1.1.6.0            sysLocation (lokalizacja)
 - 1.3.6.1.2.1.25.3.2.1.3.1     hrDeviceDescr (model)
-- 1.3.6.1.2.1.43.11.1.1.6.N    toner opis
+- 1.3.6.1.2.1.43.11.1.1.6.N    toner description
 - 1.3.6.1.2.1.43.11.1.1.8.N    toner max
 - 1.3.6.1.2.1.43.11.1.1.9.N    toner current
-- 1.3.6.1.2.1.43.10.2.1.4.1.1  licznik sumy stron
+- 1.3.6.1.2.1.43.10.2.1.4.1.1  total page counter
 
-Kazda drukarka = wlasny SnmpEngine + watek (transport na swoim IP:161),
-dzieki czemu agent rozroznia urzadzenia bez zgadywania po zrodle pakietu.
+Each printer = its own SnmpEngine + thread (transport on its own IP:161),
+so the agent distinguishes devices without guessing from the packet source.
 """
 
 import asyncio
@@ -92,7 +92,7 @@ def oid_tuple(oid):
 
 
 def find_next_oid(table, oid):
-    """Najmniejszy OID w tabeli > podanego (dla GETNEXT), albo None."""
+    """The smallest OID in the table > the given one (for GETNEXT), or None."""
     target = oid_tuple(oid)
     candidates = [oid_tuple(o) for o in table if oid_tuple(o) > target]
     if not candidates:
@@ -101,7 +101,7 @@ def find_next_oid(table, oid):
 
 
 class SimGetResponder(cmdrsp.GetCommandResponder):
-    """Odpowiada na GET (uzywane przez get_cmd w main.py)."""
+    """Answers GET (used by get_cmd in main.py)."""
 
     def __init__(self, snmpEngine, contextData, printer_ip, seed_printer):
         super().__init__(snmpEngine, contextData)
@@ -125,7 +125,7 @@ class SimGetResponder(cmdrsp.GetCommandResponder):
 
 
 class SimNextResponder(cmdrsp.NextCommandResponder):
-    """Odpowiada na GETNEXT (uzywane przez next_cmd/walk w main.py)."""
+    """Answers GETNEXT (used by next_cmd/walk in main.py)."""
 
     def __init__(self, snmpEngine, contextData, printer_ip, seed_printer):
         super().__init__(snmpEngine, contextData)
@@ -150,7 +150,7 @@ class SimNextResponder(cmdrsp.NextCommandResponder):
 
 
 class SimBulkResponder(cmdrsp.BulkCommandResponder):
-    """Minimalna obsluga GETBULK (jak GETNEXT dla 1 powtorzenia)."""
+    """Minimal GETBULK handling (like GETNEXT for 1 repetition)."""
 
     def __init__(self, snmpEngine, contextData, printer_ip, seed_printer):
         super().__init__(snmpEngine, contextData)
@@ -175,7 +175,7 @@ class SimBulkResponder(cmdrsp.BulkCommandResponder):
 
 
 def run_printer_agent(printer_ip, community, seed_printer, snmp_port):
-    """Startuje agenta SNMP dla jednej drukarki (blokujaco, w watku)."""
+    """Start the SNMP agent for one printer (blocking, in a thread)."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     snmp_engine = engine.SnmpEngine()

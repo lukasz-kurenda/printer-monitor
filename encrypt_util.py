@@ -7,43 +7,43 @@ from cryptography.fernet import Fernet
 KEY_FILE = 'secret.key'
 
 def generate_key():
-    """Generuje i zapisuje klucz szyfrujący do pliku."""
+    """Generate and save an encryption key to a file."""
     if os.path.exists(KEY_FILE):
-        print(f"Błąd: Plik klucza '{KEY_FILE}' już istnieje. Usuń go, jeśli chcesz wygenerować nowy.")
+        print(f"Error: key file '{KEY_FILE}' already exists. Remove it to generate a new one.")
         return
     key = Fernet.generate_key()
     with open(KEY_FILE, 'wb') as key_file:
         key_file.write(key)
-    print(f"Wygenerowano nowy klucz i zapisano w pliku: {KEY_FILE}")
-    print("!!! WAŻNE: Traktuj ten plik jak hasło. Przechowuj go w bezpiecznym miejscu i nie udostępniaj nikomu.")
+    print(f"New key generated and saved to: {KEY_FILE}")
+    print("!!! IMPORTANT: treat this file like a password. Store it securely and do not share it with anyone.")
 
 def encrypt_password():
-    """Szyfruje hasło podane przez użytkownika przy użyciu istniejącego klucza."""
+    """Encrypt a password provided by the user using an existing key."""
     try:
         with open(KEY_FILE, 'rb') as key_file:
             key = key_file.read()
     except FileNotFoundError:
-        print(f"Błąd: Nie znaleziono pliku klucza '{KEY_FILE}'.")
-        print("Najpierw wygeneruj klucz, używając polecenia: python encrypt_util.py --generate-key")
+        print(f"Error: key file '{KEY_FILE}' not found.")
+        print("First generate a key using: python encrypt_util.py --generate-key")
         return
 
     f = Fernet(key)
     
-    # Użyj getpass, aby hasło nie było widoczne na ekranie
-    password = getpass.getpass("Podaj hasło do zaszyfrowania: ")
+    # Use getpass so the password is not visible on screen
+    password = getpass.getpass("Enter the password to encrypt: ")
     
     encrypted_password = f.encrypt(password.encode('utf-8'))
     
-    print("\nTwoje zaszyfrowane hasło:")
+    print("\nYour encrypted password:")
     print("--------------------------------------------------")
     print(encrypted_password.decode('utf-8'))
     print("--------------------------------------------------")
-    print("\nSkopiuj powyższy ciąg znaków i wklej go do pliku config.ini w miejsce dotychczasowego hasła.")
+    print("\nCopy the string above and paste it into config.ini as the current password.")
 
 def main():
-    parser = argparse.ArgumentParser(description="Narzędzie do szyfrowania hasła SMTP.")
-    parser.add_argument('--generate-key', action='store_true', help='Generuje nowy klucz szyfrujący.')
-    parser.add_argument('--encrypt', action='store_true', help='Szyfruje hasło przy użyciu istniejącego klucza.')
+    parser = argparse.ArgumentParser(description="SMTP password encryption tool.")
+    parser.add_argument('--generate-key', action='store_true', help='Generates a new encryption key.')
+    parser.add_argument('--encrypt', action='store_true', help='Encrypts a password using the existing key.')
     args = parser.parse_args()
 
     if args.generate_key:

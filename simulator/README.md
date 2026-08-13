@@ -1,67 +1,68 @@
-# Symulator floty drukarek (test fixture)
+# Printer fleet simulator (test fixture)
 
-Narzędzie do **weryfikacji** printer-monitor bez realnych urządzeń.
-Nie jest funkcją produktu — nie rozbudowuj o nowe mechanizmy.
+A tool for **verifying** printer-monitor without real devices.
+It is NOT a product feature - do not extend it with new mechanisms.
 
-## Co symuluje
+## What it simulates
 
-| Element | Protokół | Port | Plik |
+| Element | Protocol | Port | File |
 |---|---|---|---|
-| Tonery, liczniki, model/nazwa/lokalizacja | SNMP v2c | 161/udp | `snmp_agent.py` |
-| Strony urządzeń (web scraping / Selenium) | HTTP | 80 | `web_mock.py` |
-| Stany (rotacja) | — | — | `rotate.py` + `state.json` |
+| Toners, counters, model/name/location | SNMP v2c | 161/udp | `snmp_agent.py` |
+| Device pages (web scraping / Selenium) | HTTP | 80 | `web_mock.py` |
+| States (rotation) | - | - | `rotate.py` + `state.json` |
 
-Każda drukarka = osobny wątek agenta SNMP + osobny serwer HTTP,
-bindowany na swoim aliasie IP (`ip-aliases.sh` wymaga `CAP_NET_ADMIN`).
-Stan odczytywany świeżo przy każdym zapytaniu — rotacja działa bez restartu.
+Each printer = a separate SNMP agent thread + a separate HTTP server,
+bound to its own IP alias (`ip-aliases.sh` requires `CAP_NET_ADMIN`).
+The state is re-read on every request - rotation works without restarts.
 
-## Start (kontener prnt-mon)
+## Start (prnt-mon container)
 
 ```bash
-# 1. aliasy IP (przy starcie kontenera robi to ip-aliases.sh)
+# 1. IP aliases (ip-aliases.sh runs at container startup)
 sh /workspace/simulator/ip-aliases.sh
 
-# 2. lista drukarek -> printers.csv / printers_counters.csv
+# 2. printer list -> printers.csv / printers_counters.csv
 python simulator/rotate.py write-csv
 
-# 3. agenci (w tle; -B = bez cache .pyc - wazne przy bind-mount)
+# 3. agents (background; -B = no .pyc cache - important with bind mounts)
 nohup python -B simulator/snmp_agent.py > /tmp/snmp.log 2>&1 &
 nohup python -B simulator/web_mock.py > /tmp/web.log 2>&1 &
 
-# 4. weryfikacja
-python main.py --check-toner            # stan tonerow/licznikow
-python main.py --report-counters        # raport licznikow (bez maila)
-python dashboard.py                     # dashboard na :5001
+# 4. verification
+python main.py --check-toner            # toner/counter status
+python main.py --report-counters        # counter report (no e-mail)
+python dashboard.py                     # dashboard on :5001
 ```
 
-## Rotacja stanów (hot-reload)
+## State rotation (hot-reload)
 
 ```bash
 python simulator/rotate.py list
-python simulator/rotate.py offline 172.21.0.11 true     # drukarka nie odpowiada
+python simulator/rotate.py offline 172.21.0.11 true     # printer does not respond
 python simulator/rotate.py toner  172.21.0.15 "Toner Black" --level 3
 python simulator/rotate.py toner  172.21.0.19 "Toner Black" --current -3
 python simulator/rotate.py counters 172.21.0.12 5000 8000
-python simulator/rotate.py reset                        # powrót do seed
+python simulator/rotate.py reset                        # back to seed
 ```
 
-## Scenariusze weryfikacyjne
+## Verification scenarios
 
-| Scenariusz | Polecenia | Oczekiwany efekt w main.py/dashboardzie |
+| Scenario | Commands | Expected effect in main.py/dashboard |
 |---|---|---|
-| Alert niski (prog 20%) | `toner … --level 18` | alert LOW + wpis w logu |
-| Alert krytyczny (prog 5%) | `toner … --level 3` | alert CRITICAL + mail high priority |
-| Cooldown 3 dni (W10) | alert → zmiana na 80% → alert ponownie | 2. alert NIE wysłany (timestamp w DB) |
-| Drukarka offline | `offline IP true` | SNMP timeout → 'DRUKARKA OFFLINE (TIMEOUT)' |
-| Fallback HISTORY | offline przy braku danych w DB | wpis HISTORY w raporcie liczników |
-| Wartość specjalna -3 | `toner … --current -3` | status 'low', level = toner_low_status_percent |
-| Toner nowy (max -2) | `toner … --current 0 --max -2` (seed) | status 'new', 100% |
-| Wykluczenia materiałów | Waste/Drum/Developer w seed | nie pokazują się na dashboardzie |
+| Low alert (threshold 20%) | `toner ... --level 18` | LOW alert + log entry |
+| Critical alert (threshold 5%) | `toner ... --level 3` | CRITICAL alert + high-priority e-mail |
+| 3-day cooldown (W10) | alert -> change to 80% -> alert again | 2nd alert NOT sent (timestamp in DB) |
+| Printer offline | `offline IP true` | SNMP timeout -> 'PRINTER OFFLINE (TIMEOUT)' |
+| HISTORY fallback | offline with no DB data | HISTORY entry in the counter report |
+| Special value -3 | `toner ... --current -3` | status 'low', level = toner_low_status_percent |
+| New toner (max -2) | `toner ... --current 0 --max -2` (seed) | status 'new', 100% |
+| Consumable exclusions | Waste/Drum/Developer in seed | not shown on the dashboard |
 
-## Uwagi
+## Notes
 
-- `state.json` jest gitignorowany (dane lokalne rotacji).
-- IP 172.21.0.11–22 = subnet sieci docker `prnt-mon` (172.21.0.0/16).
-- Po `docker restart prnt-mon` uruchom ponownie `ip-aliases.sh` + agentów.
-- Custom OID-y per drukarka testujesz przez sekcje `[CUSTOM_OIDS:IP]` w config.ini
-  (pokryte też testem jednostkowym `tests/test_core.py`).
+- `state.json` is gitignored (local rotation data).
+- IPs 172.21.0.11-22 = the docker `prnt-mon` network subnet (172.21.0.0/16).
+- After `docker restart prnt-mon`, `start-services.sh` restarts everything
+  automatically (IP aliases + agents + gunicorn).
+- Per-printer custom OIDs are tested via `[CUSTOM_OIDS:IP]` sections in config.ini
+  (also covered by the unit test `tests/test_core.py`).

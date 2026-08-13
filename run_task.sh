@@ -1,6 +1,6 @@
 #!/bin/bash
-# Uruchamia main.py z przekazanymi argumentami (np. --check-toner --force-toner-email).
-# Sciezki wzgledne - dziala niezaleznie od katalogu wywolania.
+# Runs main.py with the given arguments (e.g. --check-toner --force-toner-email).
+# Relative paths - works regardless of the invocation directory.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 mkdir -p "$LOG_DIR"

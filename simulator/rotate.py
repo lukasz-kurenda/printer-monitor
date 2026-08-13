@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""CLI rotacji stanow symulowanych drukarek (hot-reload przez state.json).
+"""CLI for rotating simulated printer states (hot-reload via state.json).
 
-Przyklady:
+Examples:
     python simulator/rotate.py list
     python simulator/rotate.py write-csv
     python simulator/rotate.py offline 172.21.0.11 true
@@ -11,8 +11,8 @@ Przyklady:
     python simulator/rotate.py counters 172.21.0.12 5000 8000
     python simulator/rotate.py reset
 
---current -3  = specjalna wartosc SNMP (status 'low' w main.py)
---level N     = poziom % (przeliczany na current z max z seed)
+--current -3  = special SNMP value (status 'low' in main.py)
+--level N     = level in % (converted to current from the seed max)
 """
 
 import argparse
@@ -74,13 +74,13 @@ def cmd_offline(state, ip, value):
 def cmd_toner(seed, state, ip, desc, current=None, level=None):
     printer = find_printer(seed, ip)
     if not printer:
-        sys.exit("Nie ma drukarki o IP %s" % ip)
+        sys.exit("No printer with IP %s" % ip)
     toner = next((t for t in printer["toners"] if t["desc"] == desc), None)
     if not toner:
-        sys.exit("Brak tonera '%s' u %s. Dostepne: %s"
+        sys.exit("No toner '%s' on %s. Available: %s"
                  % (desc, ip, ", ".join(t["desc"] for t in printer["toners"])))
     if current is None and level is None:
-        sys.exit("Podaj --current albo --level")
+        sys.exit("Provide --current or --level")
     if level is not None:
         current = round(toner["max"] * float(level) / 100.0)
     over = state.setdefault(ip, {}).setdefault("toners", {}).setdefault(desc, {})
@@ -100,7 +100,7 @@ def cmd_counters(state, ip, color, bw):
 def cmd_reset():
     if os.path.exists(STATE_FILE):
         os.remove(STATE_FILE)
-    print("state.json usuniety - powrot do seed")
+    print("state.json removed - back to seed")
 
 
 def cmd_write_csv(seed):
@@ -108,28 +108,28 @@ def cmd_write_csv(seed):
     for path in (PRINTERS_CSV, PRINTERS_COUNTERS_CSV):
         with open(path, "w", encoding="utf-8") as fh:
             fh.write("\n".join(ips) + "\n")
-        print("Zapisano: %s (%d IP)" % (os.path.abspath(path), len(ips)))
+        print("Saved: %s (%d IPs)" % (os.path.abspath(path), len(ips)))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Rotacja stanow symulatora drukarek")
+    parser = argparse.ArgumentParser(description="Printer fleet simulator state rotation")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("list", help="lista drukarek i stanow")
-    sub.add_parser("reset", help="wyczysc nadpisania stanow")
-    sub.add_parser("write-csv", help="zapisz IP do printers.csv / printers_counters.csv")
+    sub.add_parser("list", help="list printers and their states")
+    sub.add_parser("reset", help="clear state overrides")
+    sub.add_parser("write-csv", help="write IPs to printers.csv / printers_counters.csv")
 
-    p_offline = sub.add_parser("offline", help="wylacz/wlacz drukarke (SNMP+web)")
+    p_offline = sub.add_parser("offline", help="set a printer offline/online (SNMP+web)")
     p_offline.add_argument("ip")
     p_offline.add_argument("value", type=lambda v: v.lower() == "true")
 
-    p_toner = sub.add_parser("toner", help="ustaw toner")
+    p_toner = sub.add_parser("toner", help="set a toner level")
     p_toner.add_argument("ip")
     p_toner.add_argument("desc")
     p_toner.add_argument("--current", type=int, default=None)
     p_toner.add_argument("--level", type=float, default=None)
 
-    p_counters = sub.add_parser("counters", help="ustaw liczniki")
+    p_counters = sub.add_parser("counters", help="set counters")
     p_counters.add_argument("ip")
     p_counters.add_argument("color", type=int)
     p_counters.add_argument("bw", type=int)

@@ -1,13 +1,13 @@
-# Pliki konfiguracyjne i klucze
+# Configuration files and keys
 secret.key
 config.ini
 *.env
 
-# Baza danych
+# Database
 printers.db
 *.db
 
-# Logi
+# Logs
 *.log
 cron.log
 
@@ -19,14 +19,14 @@ __pycache__/
 .venv/
 venv/
 
-# Edytory / OS
+# Editors / OS
 .idea/
 .vscode/
 .DS_Store
 
-# Raporty / artefakty
+# Reports / artifacts
 *.xlsx
 debug.html
 
-# Symulator - stan rotacji (lokalny)
+# Simulator - rotation state (local)
 simulator/state.json

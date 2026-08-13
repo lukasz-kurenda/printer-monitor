@@ -1,6 +1,6 @@
 #!/bin/bash
-# Cron: raport licznikow + wysylka e-mail.
-# Sciezki wzgledne - dziala niezaleznie od katalogu wywolania.
+# Cron: counter report + e-mail send.
+# Relative paths - works regardless of the invocation directory.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 mkdir -p "$LOG_DIR"

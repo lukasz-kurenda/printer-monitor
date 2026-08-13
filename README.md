@@ -1,22 +1,25 @@
-# Monitor Drukarek
+# Printer Monitor
 
-## Spis treści
+## Table of Contents
 
-1.  [Szybki start](#szybki-start)
-2.  [Opis projektu](#opis-projektu)
-3.  [Główne funkcjonalności](#główne-funkcjonalności)
-4.  [Struktura projektu](#struktura-projektu)
-5.  [Instalacja i wdrożenie](#instalacja-i-wdrożenie)
-6.  [Konfiguracja](#konfiguracja)
-7.  [Użytkowanie](#użytkowanie)
-8.  [Testowanie bez drukarek (symulator)](#testowanie-bez-drukarek-symulator)
-9.  [Informacje dodatkowe](#informacje-dodatkowe)
+1.  [Quick start](#quick-start)
+2.  [Project description](#project-description)
+3.  [Main features](#main-features)
+4.  [Project structure](#project-structure)
+5.  [Installation and deployment](#installation-and-deployment)
+6.  [Configuration](#configuration)
+7.  [Usage](#usage)
+8.  [Testing without printers (simulator)](#testing-without-printers-simulator)
+9.  [Development environment (local)](#development-environment-local)
+10. [VLAN access (administrators)](#vlan-access-administrators)
+11. [Project status (roadmap)](#project-status-roadmap)
+12. [Additional information](#additional-information)
 
 ---
 
-## Szybki start
+## Quick start
 
-Wymagania: **Python 3.9+** (zalecane 3.12), Chrome/Chromium (dla web scrapingu liczników).
+Requirements: **Python 3.9+** (recommended 3.12), Chrome/Chromium (for web scraping of counters).
 
 ```bash
 git clone https://github.com/lukasz-kurenda/printer-monitor.git
@@ -25,333 +28,270 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# konfiguracja
-cp config.ini.example config.ini        # wypelnij SMTP / odbiorcow
-python encrypt_util.py --generate-key   # klucz szyfrowania hasla SMTP
-python encrypt_util.py --encrypt        # zaszyfruj haslo -> wklej do config.ini [SMTP] password
+# configuration
+cp config.ini.example config.ini        # fill in SMTP / recipients
+python encrypt_util.py --generate-key   # encryption key for the SMTP password
+python encrypt_util.py --encrypt        # encrypt the password -> paste into config.ini [SMTP] password
 
-# lista drukarek (po jednym IP na linie)
+# printer list (one IP per line)
 nano printers.csv
 
-# pierwsze uruchomienie (utworzy printers.db)
+# first run (creates printers.db)
 python main.py --check-toner
 
 # dashboard
-python dashboard.py                     # lokalnie: http://localhost:5001
-# lub produkcja:  gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app
+python dashboard.py                     # local: http://localhost:5001
+# or production:  gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app
 ```
 
-Nie masz drukarek pod ręką? Użyj wbudowanego symulatora 12 urządzeń —
-zobacz [Testowanie bez drukarek](#testowanie-bez-drukarek-symulator).
+No printers at hand? Use the built-in 12-device simulator -
+see [Testing without printers](#testing-without-printers-simulator).
 
-Uruchom testy: `python -m pytest`
+Run tests: `python -m pytest`
 
----
+## Project description
 
-## Opis projektu
+**Printer Monitor** is a comprehensive tool for managing and monitoring a fleet of
+printers in a network environment. The application automatically collects toner level
+and page counter data, presenting it in a clear web interface. Additionally, the system
+sends e-mail notifications when consumables run low or reach critical levels, as well
+as periodic counter reports.
 
-**Monitor Drukarek** to kompleksowe narzędzie do zarządzania i monitorowania floty drukarek w środowisku sieciowym. Aplikacja automatycznie zbiera dane o poziomach tonerów oraz stanach liczników stron, prezentując je w czytelnym interfejsie webowym. Dodatkowo, system wysyła powiadomienia e-mail w przypadku niskiego lub krytycznego poziomu materiałów eksploatacyjnych oraz cykliczne raporty liczników.
+The project was designed with flexibility and easy extensibility in mind.
 
-Projekt został zaprojektowany z myślą o elastyczności i łatwej rozbudowie.
+## Main features
 
-## Główne funkcjonalności
+*   **Toner level monitoring**: Automatic polling of printers via **SNMP** for current
+    consumable levels.
+*   **Page counter reporting**: Collecting color and B&W page counts via **web scraping**
+    (Selenium) and, if needed, via SNMP.
+*   **E-mail notifications**: Alerts when toner drops below configured thresholds
+    (low and critical), with a 3-day cooldown.
+*   **Web dashboard**: Flask-based interface for visualizing the status of all monitored
+    printers. Authentication: token (optional auto-login for local use), CSRF protected.
+*   **Data history**: Readings stored in a local **SQLite** database, allowing historical
+    tracking and continuity when a printer is temporarily unavailable.
+*   **Security**: SMTP password encrypted with Fernet; secrets excluded from the repository
+    (gitignore + history cleanup); sanitized HTML in e-mail reports.
+*   **Flexible configuration**: `config.ini` (recipients, thresholds, custom per-IP OIDs).
+*   **Test fleet simulator**: 12 fake printers (SNMP + HTTP) for testing without hardware.
 
-*   **Monitorowanie poziomów tonerów**: Automatyczne odpytywanie drukarek przez protokół **SNMP** w celu uzyskania informacji o aktualnych poziomach materiałów eksploatacyjnych.
-*   **Raportowanie liczników stron**: Zbieranie danych o liczbie wydrukowanych stron (kolorowych i czarno-białych) za pomocą **web scrapingu** (Selenium) oraz, w razie potrzeby, za pomocą SNMP.
-*   **Powiadomienia e-mail**: Wysyłanie alertów na skonfigurowane adresy e-mail, gdy poziom tonera spadnie poniżej określonego progu (niski i krytyczny).
-*   **Dashboard webowy**: Przejrzysty interfejs użytkownika (oparty na Flask) do wizualizacji stanu wszystkich monitorowanych drukarek w czasie rzeczywistym.
-*   **Historia danych**: Zapisywanie odczytów w lokalnej bazie danych **SQLite**, co pozwala na śledzenie historycznych stanów i zapewnia ciągłość danych w przypadku tymczasowej niedostępności drukarki.
-*   **Bezpieczeństwo**: Szyfrowanie hasła do serwera SMTP przy użyciu dedykowanego narzędzia.
-*   **Elastyczna konfiguracja**: Możliwość łatwego dostosowania ustawień (adresy e-mail, progi alertów, dane serwera SMTP, niestandardowe OIDy SNMP) za pomocą pliku `config.ini`.
-
-## Struktura projektu
+## Project structure
 
 ```
 .
-├── .gitignore          # Plik ignorujący sekrety, DB, logi, artefakty
-├── config.ini          # Główny plik konfiguracyjny (lokalny, gitignored; wzorzec: config.ini.example)
-├── config.ini.example  # Szablon konfiguracji (committed)
-├── dashboard.py        # Aplikacja webowa Flask (auth token + CSRF, SEC-K3)
-├── encrypt_util.py     # Narzędzie do szyfrowania hasła SMTP (Fernet)
-├── lockfile.py         # Blokada uruchomień (PID + ts + stale-lock, W5)
-├── main.py             # Główny skrypt do zbierania danych (SNMP + Selenium)
-├── printers.csv        # Lista adresów IP drukarek do monitorowania tonerów (testowa: simulator/rotate.py write-csv)
-├── printers_counters.csv # Lista adresów IP drukarek do raportów liczników
-├── printers.db         # Baza danych SQLite (tworzona automatycznie)
-├── requirements.txt    # Zależności (floors/caps)
-├── pytest.ini          # Konfiguracja pytest (pythonpath)
-├── README.md           # Ta dokumentacja
-├── reports/            # Raporty: security audit, session digest, pip-audit
-├── simulator/          # Symulator floty drukarek (test fixture, patrz simulator/README.md)
-├── tests/              # Testy jednostkowe (38): rdzeń, dashboard (auth/CSRF), lockfile
+├── .gitignore          # Ignores secrets, DB, logs, artifacts
+├── config.ini          # Main configuration (local, gitignored; template: config.ini.example)
+├── config.ini.example  # Configuration template (committed)
+├── dashboard.py        # Flask web app (token auth + CSRF, optional auto-login)
+├── encrypt_util.py     # SMTP password encryption utility (Fernet)
+├── lockfile.py         # Run lock (PID + timestamp + stale detection)
+├── main.py             # Main data collection script (SNMP + Selenium)
+├── printers.csv        # Printer IPs for toner monitoring (test: simulator/rotate.py write-csv)
+├── printers_counters.csv # Printer IPs for counter reports
+├── printers.db         # SQLite database (created automatically)
+├── requirements.txt    # Dependencies (floors/caps)
+├── pytest.ini          # pytest configuration (pythonpath)
+├── README.md           # This documentation
+├── CHANGELOG.md        # Version history
+├── SECURITY.md         # Security policy
+├── reports/            # Reports: security audit, session digest, pip-audit
+├── simulator/          # Printer fleet simulator (test fixture, see simulator/README.md)
+├── tests/              # Unit tests (41): core, dashboard (auth/CSRF), lockfile
+├── start-services.sh   # Container entrypoint - auto-starts all services
 └── templates/
-    ├── index.html      # Szablon dashboardu (z CSRF meta + logout)
-    └── login.html      # Strona logowania tokenem
+    ├── index.html      # Dashboard template (with CSRF meta + logout)
+    └── login.html      # Token login page
 ```
 
-## Instalacja i wdrożenie
+## Installation and deployment
 
-### Wymagania wstępne
+### Prerequisites
 
-*   Python 3.9+ (zalecane 3.12 — patrz wymagania zależności: selenium >= 4.20)
-*   Przeglądarka Google Chrome lub Chromium (wymagana przez Selenium)
-*   Dostęp sieciowy do monitorowanych drukarek (port 161 dla SNMP, port 80/443 dla web scrapingu)
+*   Python 3.9+ (recommended 3.12 - see dependency requirements: selenium >= 4.20)
+*   Google Chrome or Chromium (required by Selenium)
+*   Network access to monitored printers (port 161 for SNMP, port 80/443 for web scraping)
 
-### Kroki instalacji
+### Installation steps
 
-1.  **Sklonuj repozytorium:**
+1.  **Clone the repository:**
     ```bash
-    git clone <adres-repozytorium>
+    git clone <repository-url>
     cd printer-monitor
     ```
 
-2.  **Utwórz i aktywuj środowisko wirtualne:**
+2.  **Create and activate a virtual environment:**
     ```bash
     python3 -m venv venv
     source venv/bin/activate
     ```
 
-3.  **Zainstaluj zależności:**
+3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-4.  **Skonfiguruj aplikację:**
-    *   Skopiuj `config.ini.example` do `config.ini` (jeśli istnieje plik przykładowy) lub utwórz plik `config.ini` ręcznie.
-    *   Wypełnij wszystkie wymagane pola w `config.ini` (patrz sekcja [Konfiguracja](#konfiguracja)).
+4.  **Configure the application:**
+    *   Copy `config.ini.example` to `config.ini`.
+    *   Fill in all required fields (see [Configuration](#configuration)).
 
-5.  **Wygeneruj klucz i zaszyfruj hasło:**
-    *   Wygeneruj plik `secret.key`, który będzie używany do szyfrowania.
-        ```bash
-        python encrypt_util.py --generate-key
-        ```
-        **Ważne:** Przechowuj plik `secret.key` w bezpiecznym miejscu! Nie dodawaj go do repozytorium (jest już w `.gitignore`).
-    *   Zaszyfruj swoje hasło do serwera SMTP:
-        ```bash
-        python encrypt_util.py --encrypt
-        ```
-    *   Skopiuj wygenerowany ciąg znaków i wklej go jako wartość `password` w sekcji `[SMTP]` pliku `config.ini`.
-
-6.  **Przygotuj listy drukarek:**
-    *   Wypełnij plik `printers.csv` adresami IP drukarek, których tonery chcesz monitorować.
-    *   Wypełnij plik `printers_counters.csv` adresami IP drukarek, dla których chcesz generować raporty liczników.
-
-7.  **Zainicjuj bazę danych:**
-    *   Uruchom skrypt po raz pierwszy, aby utworzyć i zainicjować bazę danych `printers.db`.
-        ```bash
-        python main.py --check-toner
-        ```
-
-8.  **Uruchom dashboard (opcjonalnie):**
+5.  **Generate the key and encrypt the password:**
     ```bash
-    python dashboard.py
+    python encrypt_util.py --generate-key
+    python encrypt_util.py --encrypt
     ```
-    Dashboard będzie dostępny pod adresem `http://0.0.0.0:5001`.
+    Paste the generated string as the `password` value in the `[SMTP]` section of `config.ini`.
 
-## Konfiguracja
+6.  **Prepare printer lists:**
+    *   `printers.csv` - IPs for toner monitoring.
+    *   `printers_counters.csv` - IPs for counter reports.
 
-### Plik `config.ini`
-
-Plik `config.ini` jest podzielony na kilka sekcji:
-
-*   **`[SMTP]`**: Ustawienia serwera e-mail.
-    *   `server`, `port`, `user`, `sender_email`: Dane serwera SMTP.
-    *   `password`: Zaszyfrowane hasło (wygenerowane przez `encrypt_util.py`).
-    *   `use_tls`: `true` lub `false`, w zależności od wymagań serwera.
-
-*   **`[EMAILS]`**: Adresy e-mail do powiadomień.
-    *   `recipient_email_toner_low`: Adresaci alertów o niskim poziomie tonera.
-    *   `recipient_email_toner_critical`: Adresaci alertów o krytycznym poziomie tonera.
-    *   `recipient_email_counters`: Adresaci cyklicznych raportów liczników.
-
-*   **`[MONITORING]`**: Główne ustawienia skryptu.
-    *   `toner_threshold_low`, `toner_threshold_critical`: Progi procentowe dla alertów.
-    *   `snmp_community`: Nazwa społeczności SNMP (zazwyczaj `public`).
-    *   `toner_exclude_keywords`: Słowa kluczowe (oddzielone przecinkami), które powodują ignorowanie danego materiału (np. `waste,beben,developer`).
-
-*   **`[WWW]`**: Ustawienia dla web scrapingu.
-    *   `chrome_binary`: Ścieżka do pliku wykonywalnego przeglądarki Chrome/Chromium (np. `/usr/bin/chromium-browser`).
-    *   `headless`: `true`, jeśli przeglądarka ma działać w tle.
-
-
-*   **`[CUSTOM_OIDS:adres_ip]`**: (Opcjonalne) Definicja niestandardowych OID-ów SNMP dla konkretnej drukarki. Użyj tej sekcji, jeśli standardowe OIDy nie działają dla danego modelu. W tej sekcji można zdefiniować OID-y zarówno dla tonerów, jak i dla liczników stron.
-    *   `oid_desc`, `oid_max`, `oid_current`: OID-y dla opisu, wartości maksymalnej i bieżącej tonerów.
-    *   `oid_color_count`, `oid_bw_count`: OID-y dla liczników stron kolorowych i czarno-białych.
-
-#### Jak znaleźć niestandardowe OID-y?
-
-Jeśli domyślne metody odczytu danych zawodzą (szczególnie w przypadku liczników stron), konieczne może być znalezienie OID-ów specyficznych dla danego modelu drukarki. Można to zrobić za pomocą narzędzia `snmpwalk`.
-
-1.  **Zainstaluj `snmpwalk`** (jest częścią pakietu `snmp` w większości dystrybucji Linux):
-    ```bash
-    sudo apt-get update && sudo apt-get install snmp
-    ```
-
-2.  **Przeskanuj całe drzewo MIB drukarki**, aby zapisać wszystkie dostępne OID-y do pliku:
-    ```bash
-    snmpwalk -v2c -c public <adres_ip_drukarki> .1 > snmp_output.txt
-    ```
-    (Zastąp `<adres_ip_drukarki>` adresem IP drukarki, a `public` nazwą społeczności SNMP, jeśli jest inna).
-
-3.  **Przeanalizuj plik `snmp_output.txt`**: Szukaj w nim słów kluczowych, takich jak `count`, `counter`, `page`, `impression`, `black`, `color`. OID-y liczników często zawierają w opisie te słowa. Gdy znajdziesz obiecujące linie, skopiuj numeryczny OID i wklej go do odpowiedniego pola w `config.ini`.
-
-    *Przykład:* Jeśli znajdziesz OID `.1.3.6.1.4.1.XXXX.XX.1.2.3` z opisem "Total Color Pages", wklej ten numer jako wartość `oid_color_count`.
-=======
-*   **`[CUSTOM_OIDS:adres_ip]`**: (Opcjonalne) Definicja niestandardowych OID-ów SNMP dla konkretnej drukarki. Użyj tej sekcji, jeśli standardowe OIDy nie działają dla danego modelu.
-
-### Pliki z listą drukarek
-
-*   **`printers.csv`**: Każdy wiersz powinien zawierać jeden adres IP drukarki, która ma być monitorowana pod kątem stanu tonerów i wyświetlana na dashboardzie.
-*   **`printers_counters.csv`**: Każdy wiersz powinien zawierać jeden adres IP drukarki, która ma być uwzględniona w raporcie liczników.
-
-## Użytkowanie
-
-### Uruchamianie z linii poleceń
-
-Skrypt `main.py` można uruchamiać z różnymi flagami:
-
-*   **Sprawdzanie tonerów i liczników (bez wysyłania e-maili):**
+7.  **Initialize the database:**
     ```bash
     python main.py --check-toner
     ```
-*   **Wymuszenie wysłania alertów e-mail o tonerach:**
-    ```bash
-    python main.py --check-toner --force-toner-email
-    ```
-*   **Generowanie raportu liczników (bez wysyłania e-maila):**
-    ```bash
-    python main.py --report-counters
-    ```
-*   **Wymuszenie wysłania raportu liczników e-mailem:**
-    ```bash
-    python main.py --report-counters --force-counters-email
-    ```
-*   **Testowanie pojedynczej drukarki:**
-    ```bash
-    python main.py --check-toner -i 192.168.1.100
-    ```
 
-### Dashboard webowy
+8.  **Run the dashboard (optional):**
+    ```bash
+    python dashboard.py
+    ```
+    The dashboard will be available at `http://127.0.0.1:5001`.
 
-Dashboard wymaga tokenu autoryzacji (SEC-K3). Ustaw go w `[WWW] auth_token` w `config.ini`
-lub w zmiennej środowiskowej `DASH_AUTH_TOKEN` (env ma pierwszeństwo):
+## Configuration
+
+### `config.ini`
+
+*   **`[SMTP]`**: E-mail server settings (`server`, `port`, `user`, `sender_email`,
+    `password` - encrypted with Fernet, `use_tls`).
+*   **`[EMAILS]`**: Notification recipients (`recipient_email_toner_low`,
+    `recipient_email_toner_critical`, `recipient_email_counters`, `recipient_email_errors`).
+*   **`[MONITORING]`**: Thresholds (`toner_threshold_low`, `toner_threshold_critical`),
+    `snmp_community`, `snmp_timeout`, `snmp_retries`, `snmp_port`, `web_workers`,
+    keyword filters (`toner_filter_keywords`, `toner_exclude_keywords`).
+*   **`[WWW]`**: `chrome_binary`, `headless`, `auth_token` (dashboard token),
+    `auto_login` (local auto-login; keep `false` when exposed on a network).
+*   **`[CUSTOM_OIDS:ip_address]`**: (Optional) per-IP custom OIDs for toners
+    (`oid_desc`, `oid_max`, `oid_current`) and counters (`oid_color_count`, `oid_bw_count`).
+
+### Finding custom OIDs
+
+If standard reads fail (especially page counters), find model-specific OIDs with `snmpwalk`:
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(24))"   # wygeneruj token
+sudo apt-get install snmp
+snmpwalk -v2c -c public <printer_ip> .1 > snmp_output.txt
 ```
 
-**Tryb bez tokenu (auto-login):** `[WWW] auto_login = true` (lub env `DASH_AUTO_LOGIN=true`)
-— autoryzacja odbywa się automatycznie, token nie jest wymagany. Dozwolone **tylko**
-przy dostępie lokalnym (publikacja `-p 127.0.0.1:5001:5001`); CSRF na POST pozostaje
-aktywny w obu trybach. Przy trybie tokenowym sesja trwa 30 dni (token raz na 30 dni).
+Look for `count`, `counter`, `page`, `impression`, `black`, `color` keywords and copy
+the numeric OID into `config.ini`.
 
-Uruchomienie produkcyjne (gunicorn + Docker, dostęp przez `http://localhost:5001`):
+### Printer list files
+
+*   `printers.csv` / `printers_counters.csv`: one printer IP per line.
+
+## Usage
+
+### Command line
+
+*   Check toners and counters (no e-mails): `python main.py --check-toner`
+*   Force toner alerts: `python main.py --check-toner --force-toner-email`
+*   Counter report (no e-mail): `python main.py --report-counters`
+*   Force counter report e-mail: `python main.py --report-counters --force-counters-email`
+*   Single printer test: `python main.py --check-toner -i 192.168.1.100`
+
+### Web dashboard
+
+The dashboard requires an auth token (SEC-K3). Set it in `[WWW] auth_token` in `config.ini`
+or via the `DASH_AUTH_TOKEN` environment variable (env takes precedence):
 
 ```bash
-# w kontenerze (app bindowany na 0.0.0.0 - ekspozycje ogranicza docker -p)
+python -c "import secrets; print(secrets.token_urlsafe(24))"   # generate a token
+```
+
+**Token-less mode (auto-login):** `[WWW] auto_login = true` (or env `DASH_AUTO_LOGIN=true`)
+- authentication happens automatically, no token required. Allowed **only** for local
+access (publish `-p 127.0.0.1:5001:5001`); CSRF on POST remains active in both modes.
+In token mode the session lasts 30 days (token once every 30 days).
+
+Production run (gunicorn + Docker, access via `http://localhost:5001`):
+
+```bash
+# inside the container (app binds 0.0.0.0 - exposure is limited by docker -p)
 gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app
 
-# na hoscie - publikacja TYLKO na loopbacku (SEC-K3):
+# on the host - publish ONLY on loopback (SEC-K3):
 docker run -p 127.0.0.1:5001:5001 ...
 ```
 
-Tryb deweloperski (bez serwera produkcyjnego; nadal `debug=False`, bind lokalny):
+Dev mode (no production server; still `debug=False`, local bind):
 ```bash
-python dashboard.py   # slucha na 127.0.0.1:5001
+python dashboard.py   # listens on 127.0.0.1:5001
 ```
 
-Po zalogowaniu tokenem dashboard umożliwia:
-*   Przeglądanie stanu tonerów wszystkich drukarek.
-*   Ręczne uruchomienie skryptu sprawdzania tonerów (z wysyłką e-mail).
-*   Ręczne wygenerowanie i wysłanie raportu liczników.
+After logging in with the token the dashboard enables:
+*   Browsing toner status of all printers.
+*   Manually running the toner check (with e-mail alerts).
+*   Manually generating and sending the counter report.
 
-Sesja logowania jest trwała (cookie 30 dni) — token podajesz raz na 30 dni,
-nie przy każdym uruchomieniu przeglądarki.
+The session is permanent (30-day cookie) - enter the token once every 30 days,
+not on every browser start.
 
-Bez ważnej sesji wszystkie ścieżki przekierowują na `/login`; zapytania POST bez
-tokenu CSRF (nagłówek `X-CSRF-Token`) są odrzucane (HTTP 403).
+Without a valid session all routes redirect to `/login`; POST requests without a CSRF
+token (`X-CSRF-Token` header) are rejected (HTTP 403).
 
-### Automatyzacja (Cron)
+### Automation (Cron)
 
-Aby w pełni zautomatyzować monitorowanie, można dodać odpowiednie wpisy do `crontab`.
+```cron
+# Toners every 8 hours (00:05, 08:05, 16:05) with alerts
+5 0,8,16 * * * /path/to/venv/bin/python /path/to/project/main.py --check-toner --force-toner-email >> /path/to/project/logs/cron.log 2>&1
 
-*   **Edycja crontab:**
-    ```bash
-    crontab -e
-    ```
-*   **Przykładowe wpisy:**
-    ```cron
-    # Sprawdzaj tonery co 8 godzin (o 00:05, 08:05, 16:05) i wysyłaj alerty
-    5 0,8,16 * * * /sciezka/do/srodowiska/venv/bin/python /sciezka/do/projektu/main.py --check-toner --force-toner-email >> /sciezka/do/projektu/cron.log 2>&1
-
-    # Generuj i wysyłaj raport liczników pierwszego dnia każdego miesiąca o 02:05
-    5 2 1 * * /sciezka/do/srodowiska/venv/bin/python /sciezka/do/projektu/main.py --report-counters --force-counters-email >> /sciezka/do/projektu/cron.log 2>&1
-    ```
-    Pamiętaj, aby podać **pełne, bezwzględne ścieżki** do interpretera Python w środowisku wirtualnym oraz do skryptu `main.py`.
-
-
-## Testowanie bez drukarek (symulator)
-
-W repozytorium znajduje sie symulator floty **12 fikcyjnych drukarek**
-(SNMP agent + web mock), dzieki ktoremu mozna przetestowac caly system bez
-zadnego sprzetu: tonery, alerty, liczniki, dashboard.
-
-```bash
-python simulator/rotate.py write-csv   # wypelnij printers.csv adresami symulowanych drukarek
-python simulator/snmp_agent.py &       # agent SNMP (wymaga uprawnien do bindowania IP, patrz simulator/README.md)
-python simulator/web_mock.py &         # strony HTTP dla web scrapingu
-python main.py --check-toner           # normalna weryfikacja na symulatorze
-python simulator/rotate.py list        # stany drukarek
-python simulator/rotate.py toner 172.21.0.15 "Toner Black" --level 3   # rotacja stanu
+# Counter report on the 1st of each month at 02:05
+5 2 1 * * /path/to/venv/bin/python /path/to/project/main.py --report-counters --force-counters-email >> /path/to/project/logs/cron.log 2>&1
 ```
 
-Szczegóły: `simulator/README.md`.
+Use absolute paths. Alternatively use the helper scripts (`check_toners.sh`,
+`report_counters.sh`, `run_task.sh`) which resolve paths relative to their own location
+and fall back to the system `python3` when no `venv/` exists.
 
-## Stan projektu (roadmap)
+## Testing without printers (simulator)
 
-**Zakres zrealizowany (v1.1.x) — audyt + utwardzenie, bez rozbudowy:**
-- FIX: zduplikowana `get_counters_snmp` scalona (custom OID-y + fallback), izolacja błędów per-drukarka
-- SEC: historia gita oczyszczona z sekretów, dashboard z auth (token/CSRF/fail-closed), tryb auto-login
-- OPS: blokada uruchomień (PID + stale-lock), `html.escape` w raportach, walidacja IP, timeouty SNMP z configu,
-  znacznik alertu tylko po udanej wysyłce, web scraping równoległy, rotacja logów, auto-start usług
-- TEST: symulator 12 fikcyjnych drukarek (SNMP + HTTP + rotacja stanów), 41 testów, CI zielone
+The repository contains a simulator of a **fleet of 12 fake printers**
+(SNMP agent + web mock) so the whole system can be tested without any hardware:
+toners, alerts, counters, dashboard.
 
-**Decyzje projektowe:**
-- Protokół docelowy odczytu liczników: **SNMP** (web scraping pozostaje jako fallback)
-- Dashboard: lokalnie `:5001` auto-login; dla administratorów w VLAN `:5002` tryb tokenowy
-- Symulator = narzędzie testowe (nie feature produktu)
+```bash
+python simulator/rotate.py write-csv   # fill printers.csv with simulated printer addresses
+python simulator/snmp_agent.py &       # SNMP agent (requires IP binding permissions, see simulator/README.md)
+python simulator/web_mock.py &         # HTTP pages for web scraping
+python main.py --check-toner           # normal verification against the simulator
+python simulator/rotate.py list        # printer states
+python simulator/rotate.py toner 172.21.0.15 "Toner Black" --level 3   # rotate a state
+```
 
-**Planowane (poza obecnym zakresem):** wykresy historii liczników na dashboardzie, lista offline,
-kreator `config.ini`, IPv6, wiele community SNMP, webhooki powiadomień, TLS przez reverse proxy,
-osobne tokeny per administrator.
+Details: `simulator/README.md`.
 
-Szczegóły zmian: [CHANGELOG.md](CHANGELOG.md) · Bezpieczeństwo: [SECURITY.md](SECURITY.md)
+## Development environment (local)
 
-## Informacje dodatkowe
+Repository location on the host: `/opt/projects/printer-monitor`
+(= `\\wsl.localhost\Ubuntu\opt\projects\printer-monitor`).
 
-*   **Autor**: Łukasz Kurenda
-
-## Środowisko deweloperskie (lokalne)
-
-Repo na hoście: `/opt/projects/printer-monitor` (= `\\wsl.localhost\Ubuntu\opt\projects\printer-monitor`).
-
-Kontener roboczy `prnt-mon` (obraz-snapshot `prnt-mon:dev`, sieć `prnt-mon`):
+Working container `prnt-mon` (snapshot image `prnt-mon:dev`, network `prnt-mon`):
 
 ```bash
 docker run -d --name prnt-mon --network prnt-mon --hostname prnt-mon \
   --cap-add NET_ADMIN --restart unless-stopped \
-  -p 127.0.0.1:5001:5001 \        # lokalnie (auto-login)
-  -p 0.0.0.0:5002:5002 \          # VLAN (tryb tokenowy)
+  -p 127.0.0.1:5001:5001 \        # local (auto-login)
+  -p 0.0.0.0:5002:5002 \          # VLAN (token mode)
   -v /opt/projects/printer-monitor:/workspace \
   prnt-mon:dev \
   sh -c '[ -f /workspace/start-services.sh ] && sh /workspace/start-services.sh || sleep infinity'
 ```
 
-**Auto-start:** entrypoint uruchamia `start-services.sh` (aliasy IP → regeneracja
-pustej floty → agent SNMP + web mock + gunicorn). Dzięki `--restart unless-stopped`
-wszystkie usługi wracają same po restarcie serwera/WSL/dockera — bez ręcznych poleceń.
+**Auto-start:** the entrypoint runs `start-services.sh` (IP aliases -> regenerate empty
+fleet -> SNMP agent + web mock + gunicorn). Thanks to `--restart unless-stopped` all
+services come back automatically after a server/WSL/docker restart - no manual commands.
 
-Ręczny start usług (gdyby były wyłączone):
+Manual service start (if stopped):
 
 ```bash
 docker exec -d prnt-mon sh -c 'cd /workspace && nohup python -B simulator/snmp_agent.py > /tmp/snmp.log 2>&1 &'
@@ -359,37 +299,65 @@ docker exec -d prnt-mon sh -c 'cd /workspace && nohup python -B simulator/web_mo
 docker exec -d prnt-mon sh -c 'cd /workspace && nohup gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app > /tmp/gunicorn.log 2>&1 &'
 ```
 
-- Dashboard lokalny: `http://localhost:5001` — **auto-login** (bez tokenu; publikacja tylko na 127.0.0.1)
-- Dashboard VLAN: `http://<IP-maszyny>:5002` — **wymaga tokenu** (`[WWW] auth_token`)
-- Testowa flota: `python simulator/rotate.py write-csv` + `rotate.py list|offline|toner|counters|reset`
-- Testy: `python -m pytest` (wymaga zainstalowanych zależności + `pytest.ini`)
-- Rollback wersji kontenera: snapshoty obrazów `prnt-mon:dev`, `prnt-mon:rollback-20260812`
+- Local dashboard: `http://localhost:5001` - **auto-login** (no token; published only on 127.0.0.1)
+- VLAN dashboard: `http://<machine-ip>:5002` - **token required** (`[WWW] auth_token`)
+- Test fleet: `python simulator/rotate.py write-csv` + `rotate.py list|offline|toner|counters|reset`
+- Tests: `python -m pytest` (requires installed dependencies + `pytest.ini`)
+- Container rollback: image snapshots `prnt-mon:dev`, `prnt-mon:rollback-20260812`
 
-## Dostęp z VLAN-u (administratorzy, użytek wewnętrzny)
+## VLAN access (administrators)
 
-Dashboard działa na maszynie lokalnej (WSL2 + Docker), a administratorzy w obrębie
-jednego VLAN-u uzyskują dostęp przez IP maszyny (`192.168.1.80`).
+The dashboard runs on a local machine (WSL2 + Docker) and administrators within a single
+VLAN reach it via the machine IP (`192.168.1.80`).
 
-**Wymagane (tryb bezpieczny dla sieci):**
-- `[WWW] auto_login = false` — tryb tokenowy obowiązkowy (auto-login tylko lokalnie)
-- token w `[WWW] auth_token` — współdzielony między administratorami (rotuj przy zmianach kadrowych)
-- CSRF na POST aktywny automatycznie
+**Required (secure mode for a network):**
+- `[WWW] auto_login = false` - token mode mandatory (auto-login is local-only)
+- token in `[WWW] auth_token` - shared between administrators (rotate on staff changes)
+- CSRF on POST is active automatically
 
-**Mapowanie sieci (WSL2 NAT → VLAN):**
+**Network mapping (WSL2 NAT -> VLAN):**
 
 ```bash
-# 1. Docker publikuje na wszystkich interfejsach WSL:
+# 1. Docker publishes on all WSL interfaces:
 #    docker run ... -p 0.0.0.0:5002:5002 ...
 
-# 2. Windows — portproxy (wymaga konsoli ADMIN):
+# 2. Windows - portproxy (requires ADMIN console):
 netsh interface portproxy add v4tov4 listenport=5002 listenaddress=192.168.1.80 connectport=5002 connectaddress=127.0.0.1
 
-# 3. Windows — reguła firewalla (ADMIN):
+# 3. Windows - firewall rule (ADMIN):
 netsh advfirewall firewall add rule name="prnt-mon-dashboard" dir=in action=allow protocol=TCP localport=5002
 ```
 
-Uwagi:
-- `connectaddress=127.0.0.1` omija problem zmiany IP WSL2 po restarcie (Windows loopback → WSL localhostForwarding)
-- Alternatywa bez portproxy: `networkingMode=mirrored` w `%UserProfile%\.wslconfig` (WSL dzieli interfejsy Windows) + `wsl --shutdown`
-- Dostęp admina: `http://192.168.1.80:5002` + token (port 5001 jest tylko lokalny)
-- Zalecane na przyszłość: TLS przez caddy/reverse proxy oraz osobne tokeny per admin (poza obecnym zakresem audytu)
+Notes:
+- `connectaddress=127.0.0.1` avoids the WSL2 IP change issue after restart
+  (Windows loopback -> WSL localhostForwarding)
+- Alternative without portproxy: `networkingMode=mirrored` in `%UserProfile%\.wslconfig`
+  (WSL shares Windows interfaces) + `wsl --shutdown`
+- Admin access: `http://192.168.1.80:5002` + token (port 5001 is local-only)
+- Future recommendations (out of current scope): TLS via caddy/reverse proxy and
+  per-administrator tokens
+
+## Project status (roadmap)
+
+**Completed scope (v1.1.x) - audit + hardening, no expansion:**
+- FIX: duplicated `get_counters_snmp` merged (custom OIDs + fallback), per-printer error isolation
+- SEC: git history purged of secrets, dashboard auth (token/CSRF/fail-closed), auto-login mode
+- OPS: run lock (PID + stale detection), `html.escape` in reports, IP validation,
+  SNMP timeouts from config, alert timestamp only after successful send, parallel web scraping,
+  log rotation, service auto-start
+- TEST: 12-device fleet simulator (SNMP + HTTP + state rotation), 41 tests, green CI
+
+**Project decisions:**
+- Target counter-read protocol: **SNMP** (web scraping remains as fallback)
+- Dashboard: local `:5001` auto-login; VLAN administrators `:5002` token mode
+- Simulator = test tool (not a product feature)
+
+**Planned (out of current scope):** counter history charts on the dashboard, offline list,
+`config.ini` wizard, IPv6, multiple SNMP communities, notification webhooks,
+TLS via reverse proxy, per-administrator tokens.
+
+Details: [CHANGELOG.md](CHANGELOG.md) - Security: [SECURITY.md](SECURITY.md)
+
+## Additional information
+
+*   **Author**: Lukasz Kurenda

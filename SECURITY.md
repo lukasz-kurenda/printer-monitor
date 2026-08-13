@@ -4,23 +4,23 @@
 
 | Version | Supported |
 | ------- | --------- |
-| main (1.1.x) | ✅ |
+| main (1.1.x) | :white_check_mark: |
 
 ## Reporting a vulnerability
 
-Proszę NIE zgłaszać podatności w publicznych issue. Skontaktuj się bezpośrednio:
+Please do NOT report vulnerabilities in public issues. Contact directly:
 
 - GitHub Security Advisories: https://github.com/lukasz-kurenda/printer-monitor/security/advisories/new
-- lub otwórz prywatny raport przez "Report a vulnerability" w zakładce Security repozytorium.
+- or open a private report via "Report a vulnerability" in the repository's Security tab.
 
-## Co podlega zgłoszeniu
+## What should be reported
 
-- Wstrzyknięcia (HTML/SQL/OS) w raportach lub dashboardzie
-- Problemy autoryzacji/CSRF w dashboardzie
-- Wycieki danych urządzeń (nazwy, lokalizacje, liczniki)
-- Zależności z znanymi podatnościami (sprawdzenie: `pip-audit -r requirements.txt`)
+- Injections (HTML/SQL/OS) in reports or the dashboard
+- Authentication/CSRF issues in the dashboard
+- Device data leaks (names, locations, counters)
+- Dependencies with known vulnerabilities (check: `pip-audit -r requirements.txt`)
 
-## Zasady
+## Policy
 
-- Potwierdzenie zgłoszenia: 72h, status co 7 dni.
-- Publikacja szczegółów po wydaniu poprawki.
+- Acknowledgment within 72h, status updates every 7 days.
+- Details published after the fix is released.
