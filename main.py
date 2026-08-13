@@ -808,7 +808,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     if critical_toner_alerts:
         subject = f"[URGENT] Critical toner level ({len(critical_toner_alerts)} alerts)"
         html_body = create_html_report(critical_toner_alerts, today, "Toner", "critical")
-        print_alert_summary("KRYTYCZNY", critical_toner_alerts)
+        print_alert_summary("CRITICAL", critical_toner_alerts)
         if force_email:
             sent = send_email_notification(subject, html_body, config, 'recipient_email_toner_critical', priority='high')
             if sent:
@@ -817,7 +817,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     if low_toner_alerts:
         subject = f"[WARNING] Low toner level ({len(low_toner_alerts)} alerts)"
         html_body = create_html_report(low_toner_alerts, today, "Toner", "low")
-        print_alert_summary("NISKI", low_toner_alerts)
+        print_alert_summary("LOW", low_toner_alerts)
         if force_email:
             sent = send_email_notification(subject, html_body, config, 'recipient_email_toner_low')
             if sent:
