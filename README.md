@@ -295,3 +295,32 @@ docker exec -d prnt-mon sh -c 'cd /workspace && nohup gunicorn -w 1 --bind 0.0.0
 - Testowa flota: `python simulator/rotate.py write-csv` + `rotate.py list|offline|toner|counters|reset`
 - Testy: `python -m pytest` (wymaga zainstalowanych zależności + `pytest.ini`)
 - Rollback wersji kontenera: snapshoty obrazów `prnt-mon:dev`, `prnt-mon:rollback-20260812`
+
+## Dostęp z VLAN-u (administratorzy, użytek wewnętrzny)
+
+Dashboard działa na maszynie lokalnej (WSL2 + Docker), a administratorzy w obrębie
+jednego VLAN-u uzyskują dostęp przez IP maszyny (`192.168.1.80`).
+
+**Wymagane (tryb bezpieczny dla sieci):**
+- `[WWW] auto_login = false` — tryb tokenowy obowiązkowy (auto-login tylko lokalnie)
+- token w `[WWW] auth_token` — współdzielony między administratorami (rotuj przy zmianach kadrowych)
+- CSRF na POST aktywny automatycznie
+
+**Mapowanie sieci (WSL2 NAT → VLAN):**
+
+```bash
+# 1. Docker publikuje na wszystkich interfejsach WSL:
+#    docker run ... -p 0.0.0.0:5001:5001 ...
+
+# 2. Windows — portproxy (wymaga konsoli ADMIN):
+netsh interface portproxy add v4tov4 listenport=5001 listenaddress=192.168.1.80 connectport=5001 connectaddress=127.0.0.1
+
+# 3. Windows — reguła firewalla (ADMIN):
+netsh advfirewall firewall add rule name="prnt-mon-dashboard" dir=in action=allow protocol=TCP localport=5001
+```
+
+Uwagi:
+- `connectaddress=127.0.0.1` omija problem zmiany IP WSL2 po restarcie (Windows loopback → WSL localhostForwarding)
+- Alternatywa bez portproxy: `networkingMode=mirrored` w `%UserProfile%\.wslconfig` (WSL dzieli interfejsy Windows) + `wsl --shutdown`
+- Dostęp admina: `http://192.168.1.80:5001` + token
+- Zalecane na przyszłość: TLS przez caddy/reverse proxy oraz osobne tokeny per admin (poza obecnym zakresem audytu)
