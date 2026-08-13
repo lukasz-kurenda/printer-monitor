@@ -10,7 +10,7 @@ import secrets
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (Flask, jsonify, redirect, render_template, request, session,
                    url_for)
@@ -71,10 +71,12 @@ def load_auth_token():
 
 AUTH_TOKEN = load_auth_token()
 app.secret_key = AUTH_TOKEN or 'prnt-mon-session-signing-fallback'
+app.permanent_session_lifetime = timedelta(days=30)
 
 
 @app.before_request
 def require_auth_and_csrf():
+    session.permanent = True  # sesja cookie 30 dni - token podawany rzadko
     if not AUTH_TOKEN:
         return ("Blad: brak tokenu autoryzacji. Ustaw DASH_AUTH_TOKEN (env) "
                 "lub auth_token w sekcji [WWW] config.ini.", 503)

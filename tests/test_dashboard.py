@@ -80,6 +80,13 @@ def test_login_success_and_access(client):
     assert '172.21.0.11' in rv.get_data(as_text=True)
 
 
+def test_session_is_permanent_after_login(client):
+    csrf = _csrf(client)
+    client.post('/login', data={'token': TOKEN, 'csrf_token': csrf})
+    with client.session_transaction() as sess:
+        assert sess.permanent is True
+
+
 def test_post_without_csrf_blocked(client):
     _auth(client)
     rv = client.post('/run-check-toner')

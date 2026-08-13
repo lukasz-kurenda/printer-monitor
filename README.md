@@ -231,6 +231,9 @@ Po zalogowaniu tokenem dashboard umożliwia:
 *   Ręczne uruchomienie skryptu sprawdzania tonerów (z wysyłką e-mail).
 *   Ręczne wygenerowanie i wysłanie raportu liczników.
 
+Sesja logowania jest trwała (cookie 30 dni) — token podajesz raz na 30 dni,
+nie przy każdym uruchomieniu przeglądarki.
+
 Bez ważnej sesji wszystkie ścieżki przekierowują na `/login`; zapytania POST bez
 tokenu CSRF (nagłówek `X-CSRF-Token`) są odrzucane (HTTP 403).
 
@@ -268,10 +271,14 @@ docker run -d --name prnt-mon --network prnt-mon --hostname prnt-mon \
   -p 127.0.0.1:5001:5001 \
   -v /opt/projects/printer-monitor:/workspace \
   prnt-mon:dev \
-  sh -c '[ -f /workspace/simulator/ip-aliases.sh ] && sh /workspace/simulator/ip-aliases.sh; sleep infinity'
+  sh -c '[ -f /workspace/start-services.sh ] && sh /workspace/start-services.sh || sleep infinity'
 ```
 
-Po starcie kontenera podnieś usługi:
+**Auto-start:** entrypoint uruchamia `start-services.sh` (aliasy IP → regeneracja
+pustej floty → agent SNMP + web mock + gunicorn). Dzięki `--restart unless-stopped`
+wszystkie usługi wracają same po restarcie serwera/WSL/dockera — bez ręcznych poleceń.
+
+Ręczny start usług (gdyby były wyłączone):
 
 ```bash
 docker exec -d prnt-mon sh -c 'cd /workspace && nohup python -B simulator/snmp_agent.py > /tmp/snmp.log 2>&1 &'
