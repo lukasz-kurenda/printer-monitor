@@ -1,6 +1,6 @@
 #!/bin/sh
 # Assigns IP aliases (from seed.json) to eth0 - requires CAP_NET_ADMIN.
-# Uruchamiane przy starcie kontenera oraz recznie po `docker restart`.
+# Run at container startup and manually after `docker restart`.
 set -e
 
 SIM_DIR="$(cd "$(dirname "$0")" && pwd)"

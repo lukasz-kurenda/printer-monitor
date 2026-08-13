@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Testy mechanizmu blokady (OPS-W5)."""
+"""Lock mechanism tests (OPS-W5)."""
 
 import json
 import os

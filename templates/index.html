@@ -224,11 +224,11 @@
             const notification = document.getElementById('notification');
 
             updateBtn.addEventListener('click', () => {
-                triggerScript('/run-check-toner', updateBtn, 'Aktualizowanie...');
+                triggerScript('/run-check-toner', updateBtn, 'Updating...');
             });
 
             reportBtn.addEventListener('click', () => {
-                triggerScript('/run-report-counters', reportBtn, 'Generowanie...');
+                triggerScript('/run-report-counters', reportBtn, 'Generating...');
             });
 
             function triggerScript(endpoint, button, loadingText) {

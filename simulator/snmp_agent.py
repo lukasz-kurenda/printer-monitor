@@ -2,8 +2,8 @@
 """SNMP agent simulating a fleet of printers (pysnmp 7, CommandResponder).
 
 Answers on the OID tree that main.py queries:
-- 1.3.6.1.2.1.1.5.0            sysName (nazwa)
-- 1.3.6.1.2.1.1.6.0            sysLocation (lokalizacja)
+- 1.3.6.1.2.1.1.5.0            sysName (name)
+- 1.3.6.1.2.1.1.6.0            sysLocation (location)
 - 1.3.6.1.2.1.25.3.2.1.3.1     hrDeviceDescr (model)
 - 1.3.6.1.2.1.43.11.1.1.6.N    toner description
 - 1.3.6.1.2.1.43.11.1.1.8.N    toner max
@@ -43,7 +43,7 @@ def load_state():
 
 
 def resolve_printer(seed_printer):
-    """Stan = seed + nadpisania ze state.json (hot-reload na kazde zapytanie)."""
+    """State = seed + overrides from state.json (hot-reload on every request)."""
     printer = dict(seed_printer)
     printer["toners"] = [dict(t) for t in seed_printer.get("toners", [])]
     printer["counters"] = dict(seed_printer.get("counters", {}))
@@ -63,7 +63,7 @@ def resolve_printer(seed_printer):
 
 
 def build_oid_table(printer):
-    """Slownik '1.2.3.4' -> (typ, wartosc). Typy: octet|int|counter."""
+    """Map "1.2.3.4" -> (type, value). Types: octet|int|counter."""
     table = {
         "1.3.6.1.2.1.1.5.0": ("octet", printer.get("name", "")),
         "1.3.6.1.2.1.1.6.0": ("octet", printer.get("location", "")),

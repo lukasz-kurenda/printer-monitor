@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Testy jednostkowe rdzenia printer-monitor (bez sieci i Selenium)."""
+"""Unit tests for the printer-monitor core (no network, no Selenium)."""
 
 import asyncio
 import configparser
@@ -8,7 +8,7 @@ import sqlite3
 import main
 
 
-# --- Konfiguracja ---
+# --- Configuration ---
 
 def _monitoring_config():
     cfg = configparser.ConfigParser()
@@ -30,14 +30,14 @@ def test_load_config_reads_sections(tmp_path, monkeypatch):
         "snmp_community = public\n"
     )
     monkeypatch.setattr(main, "CONFIG_FILE", str(cfg_file))
-    config = main.load_config()
+    config = main.load_config(str(cfg_file))
     assert config.getint("MONITORING", "toner_threshold_low") == 20
     assert config.get("MONITORING", "snmp_community") == "public"
 
 
 def test_load_config_missing_file_returns_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "CONFIG_FILE", str(tmp_path / "nope.ini"))
-    config = main.load_config()
+    config = main.load_config(str(tmp_path / "nope.ini"))
     assert not config.sections()
 
 
@@ -145,7 +145,7 @@ def test_toner_levels_special_values(monkeypatch):
     assert by_desc["Toner New"]["status"] == "new"
 
 
-# --- Liczniki stron (SNMP, FIX-K2) ---
+# --- Page counters (SNMP, FIX-K2) ---
 
 def test_counters_custom_oids(monkeypatch):
     async def fake_get(ip, oids, community, **kw):
@@ -153,7 +153,7 @@ def test_counters_custom_oids(monkeypatch):
 
     monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
     custom = {"oid_color_count": "1.3.6.1.4.1.999.100", "oid_bw_count": "1.3.6.1.4.1.999.101"}
-    result = asyncio.run(main.get_counters_snmp("192.0.2.1", "public", "", custom))
+    result = asyncio.run(main.get_counters_snmp("192.0.2.1", "public", custom))
     assert result == {"color": 12, "bw": 34, "sum": 46, "status": "OK"}
 
 
@@ -163,7 +163,7 @@ def test_counters_custom_oids_both_missing(monkeypatch):
 
     monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
     custom = {"oid_color_count": "1.3.6.1.4.1.999.100", "oid_bw_count": "1.3.6.1.4.1.999.101"}
-    assert asyncio.run(main.get_counters_snmp("192.0.2.1", "public", "", custom)) is None
+    assert asyncio.run(main.get_counters_snmp("192.0.2.1", "public", custom)) is None
 
 
 def test_counters_fallback_total(monkeypatch):
@@ -175,7 +175,7 @@ def test_counters_fallback_total(monkeypatch):
     assert result == {"color": 0, "bw": 5000, "sum": 5000, "status": "OK"}
 
 
-# --- Raporty HTML ---
+# --- HTML reports ---
 
 def test_create_html_report_toner():
     data = [{"ip": "192.0.2.1", "location": "A", "name": "P1", "model": "M", "desc": "Toner Black", "level": 12.0}]
@@ -214,7 +214,7 @@ def test_create_html_report_counters_summary():
     assert "10" in html and "20" in html and "30" in html
 
 
-# --- Znaczniki alertow w bazie ---
+# --- Alert timestamps in the database ---
 
 def test_alert_timestamp_roundtrip(tmp_path, monkeypatch):
     db_file = tmp_path / "printers.db"
@@ -268,7 +268,7 @@ def test_snmp_timeout_retries_port_wired(monkeypatch):
     assert captured["addr"] == ("192.0.2.1", 1161)
 
 
-# --- W10: znacznik alertu tylko po udanej wysylce ---
+# --- W10: alert timestamp only after a successful send ---
 
 def _alert_config():
     cfg = configparser.ConfigParser()
@@ -303,7 +303,7 @@ def _patch_check_toner(monkeypatch, send_result):
     def _spy(alerts):
         calls["timestamps"] += 1
 
-    monkeypatch.setattr(main, "load_config", _alert_config)
+    monkeypatch.setattr(main, "load_config", lambda config_file: _alert_config())
     monkeypatch.setattr(main, "load_printers", lambda: [{"ip": "192.0.2.1"}])
     monkeypatch.setattr(main, "scrape_all_with_selenium", lambda ips, config: {})
     monkeypatch.setattr(main, "get_printer_base_info", _base)

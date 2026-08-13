@@ -2,7 +2,6 @@
 
 import csv
 import argparse
-import configparser
 import html
 import ipaddress
 import smtplib
@@ -21,6 +20,7 @@ from cryptography.fernet import Fernet
 import sqlite3
 
 import lockfile
+from common import LOCK_MAX_AGE_SECONDS, load_config, setup_logging
 
 # Komponenty do web scrapingu
 from selenium import webdriver
@@ -44,7 +44,7 @@ from pysnmp.hlapi.asyncio import (
     ContextData, ObjectType, ObjectIdentity, get_cmd, next_cmd
 )
 
-# --- Konfiguracja ---
+# --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.ini')
 PRINTERS_FILE = os.path.join(BASE_DIR, 'printers.csv')
@@ -54,39 +54,12 @@ LOCK_FILE = os.path.join(BASE_DIR, 'script.lock')
 WEB_WORKERS_DEFAULT = 3
 
 
-def setup_logging():
-    """Console logging + rotating file (SHOULD: log rotation)."""
-    fmt = '%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    if root.handlers:
-        for handler in root.handlers:
-            handler.setFormatter(logging.Formatter(fmt))
-        return
-    stream = logging.StreamHandler()
-    stream.setFormatter(logging.Formatter(fmt))
-    root.addHandler(stream)
-    config = load_config()
-    log_file = 'printer_monitor.log'
-    if config and config.has_option('MONITORING', 'log_file'):
-        log_file = config.get('MONITORING', 'log_file')
-    try:
-        rotating = logging.handlers.RotatingFileHandler(
-            os.path.join(BASE_DIR, log_file), maxBytes=1024 * 1024, backupCount=3,
-            encoding='utf-8')
-        rotating.setFormatter(logging.Formatter(fmt))
-        root.addHandler(rotating)
-    except OSError:
-        pass
-
-
-# --- Funkcje Bazy Danych ---
 def init_db():
     """Initialize the database and create/update tables."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
-        
+
         cur.execute('''
             CREATE TABLE IF NOT EXISTS toner_status (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,7 +74,7 @@ def init_db():
                 UNIQUE(ip_address, toner_desc)
             )
         ''')
-        
+
         cur.execute('''
             CREATE TABLE IF NOT EXISTS counter_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,17 +97,18 @@ def init_db():
                 run_timestamp TEXT
             )
         ''')
-        
+
         try:
             cur.execute('ALTER TABLE toner_status ADD COLUMN alert_sent_timestamp TEXT')
         except sqlite3.OperationalError:
-            pass 
+            pass
 
         con.commit()
         con.close()
         logging.info(f"Database '{DB_FILE}' initialized/updated.")
     except Exception as e:
         logging.error(f"Failed to initialize the database: {e}")
+
 
 def log_script_run(run_type):
     """Record the timestamp of the last script run."""
@@ -149,13 +123,14 @@ def log_script_run(run_type):
     except Exception as e:
         logging.error(f"Failed to record script run info: {e}")
 
+
 def update_toner_status_in_db(toner_data):
     """Save or update toner status in the database."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         for toner in toner_data:
             cur.execute('''
                 INSERT INTO toner_status (ip_address, model, device_name, location, toner_desc, toner_level, last_updated)
@@ -176,6 +151,7 @@ def update_toner_status_in_db(toner_data):
     except Exception as e:
         logging.error(f"Failed to update data in the database: {e}")
 
+
 def update_alert_timestamp(alerts):
     """Update the alert-sent timestamp for the given toners."""
     try:
@@ -190,7 +166,8 @@ def update_alert_timestamp(alerts):
         con.close()
         logging.info(f"Updated alert-sent timestamps for {len(alerts)} toners.")
     except Exception as e:
-        logging.error(f"Failed to update alert timestamps in the database: {e}")
+        logging.error("Failed to update alert timestamps in the database: %s", e)
+
 
 def get_last_alert_timestamp(ip, desc):
     """Get the last alert date for the given toner."""
@@ -206,13 +183,14 @@ def get_last_alert_timestamp(ip, desc):
         logging.error(f"Error reading alert timestamp from the database: {e}")
     return None
 
+
 def save_counter_history(counters_data):
     """Save counter history to the database."""
     try:
         con = sqlite3.connect(DB_FILE)
         cur = con.cursor()
         today_str = datetime.now().strftime("%Y-%m-%d")
-        
+
         for data in counters_data:
             if data.get('status') == 'OK':
                 cur.execute('''
@@ -235,16 +213,17 @@ def save_counter_history(counters_data):
     except Exception as e:
         logging.error(f"Failed to save counter history in the database: {e}")
 
+
 def get_last_known_counter(ip):
     """Get the last known counter state for the given IP."""
     try:
         con = sqlite3.connect(DB_FILE)
-        con.row_factory = sqlite3.Row # Enables column access by name
+        con.row_factory = sqlite3.Row  # Enables column access by name
         cur = con.cursor()
         cur.execute('''
-            SELECT * FROM counter_history 
-            WHERE ip_address = ? 
-            ORDER BY report_date DESC 
+            SELECT * FROM counter_history
+            WHERE ip_address = ?
+            ORDER BY report_date DESC
             LIMIT 1
         ''', (ip,))
         result = cur.fetchone()
@@ -254,15 +233,8 @@ def get_last_known_counter(ip):
         logging.error(f"Error reading counter history for {ip}: {e}")
     return None
 
-# --- Funkcje pomocnicze i konfiguracyjne ---
-def load_config():
-    config = configparser.ConfigParser()
-    try:
-        config.read(CONFIG_FILE, encoding='utf-8')
-    except UnicodeDecodeError:
-        logging.warning("Failed to read config.ini as UTF-8. Trying 'windows-1250'...")
-        config.read(CONFIG_FILE, encoding='windows-1250')
-    return config
+# --- Helper and configuration functions ---
+
 
 def load_printers():
     """Load printers for toner monitoring and dashboard display."""
@@ -285,6 +257,7 @@ def load_printers():
         logging.error(f"CRITICAL ERROR: file '{PRINTERS_FILE}' not found!")
     return printers
 
+
 def load_printers_for_counters():
     """Load printers for counter reports."""
     printers = []
@@ -306,12 +279,14 @@ def load_printers_for_counters():
         logging.warning(f"File '{PRINTERS_COUNTERS_FILE}' does not exist. The counter report will not be generated.")
     return printers
 
+
 def get_custom_oids_for_ip(config, ip):
     section_name = f"CUSTOM_OIDS:{ip}"
     if config.has_section(section_name):
         logging.info(f"[{ip}] Custom OID configuration found.")
         return dict(config.items(section_name))
     return {}
+
 
 def send_email_notification(subject, html_body, config, recipient_key, attachment_path=None, priority=None):
     logging.info(f"Attempting to send e-mail notification (key: {recipient_key}, priority: {priority})")
@@ -350,7 +325,7 @@ def send_email_notification(subject, html_body, config, recipient_key, attachmen
             return False
 
     try:
-        # Wczytaj klucz z pliku
+        # Read the key from the file
         with open(os.path.join(BASE_DIR, 'secret.key'), 'rb') as key_file:
             key = key_file.read()
 
@@ -368,7 +343,8 @@ def send_email_notification(subject, html_body, config, recipient_key, attachmen
         logging.critical("CRITICAL ERROR: key file 'secret.key' not found! Cannot send e-mail.")
         return False
     except Exception as e:
-        logging.critical(f"CRITICAL ERROR: failed to decrypt the password. Error: {e}. Check the key and password in config.ini.")
+        logging.critical("CRITICAL ERROR: failed to decrypt the password. Error: %s. "
+                         "Check the key and password in config.ini.", e)
         return False
 
     try:
@@ -394,49 +370,53 @@ def send_email_notification(subject, html_body, config, recipient_key, attachmen
         logging.error(f"Error while sending e-mail: {e}", exc_info=True)
     return False
 
+
 def print_alert_summary(alert_level, alerts):
     """Print an alert summary to the terminal."""
     if not alerts:
         return
-        
+
     print(f"\n{'='*60}")
     print(f"  ALERT SUMMARY - LEVEL {alert_level}")
     print(f"{'='*60}")
     print(f"Number of alerts: {len(alerts)}")
     print("-" * 60)
-    
+
     for alert in alerts:
         ip = alert.get('ip', 'N/A')
-        location = alert.get('location', 'Brak lokalizacji')
+        location = alert.get('location', 'No location')
         name = alert.get('name', 'Brak nazwy')
         desc = alert.get('desc', 'N/A')
         level = alert.get('level', 0)
-        
+
         print(f"- {ip} | {location}")
         print(f"  {name}")
         print(f"  Toner: {desc} - Level: {level:.1f}%")
         print("-" * 60)
-    
+
     print(f"{'='*60}\n")
 
 # --- Funkcje SNMP ---
+
+
 async def get_snmp_data_async(ip, oids, community, timeout=5, retries=1, port=161):
     oids = [oid for oid in oids if oid]
-    if not oids: return {}
-    
+    if not oids:
+        return {}
+
     snmp_engine = SnmpEngine()
     transport_target = await UdpTransportTarget.create((ip, port), timeout=timeout, retries=retries)
     results = {}
-    
+
     try:
         object_types = [ObjectType(ObjectIdentity(oid)) for oid in oids]
         error_indication, error_status, error_index, var_binds = await get_cmd(
             snmp_engine, CommunityData(community), transport_target, ContextData(), *object_types
         )
         if error_indication:
-            logging.debug(f"[{ip}] Blad SNMP (get_cmd): {error_indication}")
+            logging.debug(f"[{ip}] SNMP error (get_cmd): {error_indication}")
         elif error_status:
-            logging.debug(f"[{ip}] Blad statusu SNMP (get_cmd): {error_status.prettyPrint()}")
+            logging.debug(f"[{ip}] SNMP status error (get_cmd): {error_status.prettyPrint()}")
             for var_oid, val in var_binds:
                 if 'noSuch' not in str(val):
                     results[str(var_oid)] = str(val)
@@ -447,6 +427,7 @@ async def get_snmp_data_async(ip, oids, community, timeout=5, retries=1, port=16
         logging.error(f"[{ip}] Wyjatek w get_snmp_data_async: {e}")
     return results
 
+
 async def get_printer_base_info(ip, community, timeout=5, retries=1, port=161):
     oids = ['1.3.6.1.2.1.25.3.2.1.3.1', '1.3.6.1.2.1.1.5.0', '1.3.6.1.2.1.1.6.0']
     data = await get_snmp_data_async(ip, oids, community, timeout=timeout, retries=retries, port=port)
@@ -454,6 +435,7 @@ async def get_printer_base_info(ip, community, timeout=5, retries=1, port=161):
     name = data.get('1.3.6.1.2.1.1.5.0', "None")
     location = data.get('1.3.6.1.2.1.1.6.0', "None")
     return {'model': model, 'name': name, 'location': location}
+
 
 async def walk_snmp_oid(ip, community, oid, timeout=10, retries=2, port=161):
     results = {}
@@ -465,17 +447,20 @@ async def walk_snmp_oid(ip, community, oid, timeout=10, retries=2, port=161):
             error_indication, error_status, error_index, var_bind_table = await next_cmd(
                 snmp_engine, CommunityData(community), transport_target, ContextData(), *var_binds
             )
-            if error_indication or error_status: break
+            if error_indication or error_status:
+                break
             var_binds = var_bind_table[0]
             current_oid, current_val = var_binds
-            if not str(current_oid).startswith(oid): break
+            if not str(current_oid).startswith(oid):
+                break
             index = str(current_oid).replace(f"{oid}.", '')
             results[index] = str(current_val)
-            var_binds = [var_binds] 
+            var_binds = [var_binds]
         except Exception as e:
             logging.error(f"[{ip}] Error during SNMP 'walk' for OID {oid}: {e}")
             break
     return results
+
 
 async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
     """
@@ -572,12 +557,13 @@ async def get_toner_levels_snmp(ip, community, config, custom_oids=None):
     logging.info(f"[{ip}] Processed data for {len(toners)} toners.")
     return toners
 
-# --- FUNKCJE DLA LICZNIKOW ---
+# --- COUNTER FUNCTIONS ---
+
 
 def init_selenium_driver(config):
-    """Inicjalizuje i zwraca instancje sterownika Selenium Chrome."""
+    """Initialize and return a Selenium Chrome driver instance."""
     try:
-        logging.info("Inicjalizacja sterownika Selenium...")
+        logging.info("Initializing the Selenium driver...")
         chrome_options = Options()
         chrome_options.binary_location = config['WWW']['chrome_binary']
         if config['WWW'].getboolean('headless', fallback=True):
@@ -594,7 +580,7 @@ def init_selenium_driver(config):
         return None
 
 
-async def get_counters_snmp(ip, community, model_name="", custom_oids=None,
+async def get_counters_snmp(ip, community, custom_oids=None,
                             timeout=5, retries=1, port=161):
     """
     Reads page counters over SNMP.
@@ -637,6 +623,7 @@ async def get_counters_snmp(ip, community, model_name="", custom_oids=None,
             logging.warning(f"[{ip}] Failed to process the SNMP total counter.")
     return None
 
+
 def get_web_data_with_selenium(driver, ip_address):
     """Fetch data over HTTP, using WebDriverWait for greater stability."""
     try:
@@ -648,30 +635,34 @@ def get_web_data_with_selenium(driver, ip_address):
         driver.get(f"http://{ip_address}/?MAIN=DEVICE")
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
-        
+
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         name_tag = soup.find(id='DeviceName')
-        if name_tag: web_data['name'] = name_tag.get_text(strip=True)
+        if name_tag:
+            web_data['name'] = name_tag.get_text(strip=True)
         location_tag = soup.find(id='DeviceLocation')
-        if location_tag: web_data['location'] = location_tag.get_text(strip=True)
+        if location_tag:
+            web_data['location'] = location_tag.get_text(strip=True)
         driver.switch_to.default_content()
 
         # Fetch counter information
         driver.get(f"http://{ip_address}/?MAIN=COUNTER&SUB=TOTAL")
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "TopLevelFrame")))
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "contents")))
-        
+
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         color_cell = soup.find('td', id='TotalFullColor')
-        if color_cell: web_data['color'] = int(color_cell.get_text(strip=True))
+        if color_cell:
+            web_data['color'] = int(color_cell.get_text(strip=True))
         bw_cell = soup.find('td', id='TotalBlackColor')
-        if bw_cell: web_data['bw'] = int(bw_cell.get_text(strip=True))
+        if bw_cell:
+            web_data['bw'] = int(bw_cell.get_text(strip=True))
         driver.switch_to.default_content()
 
         if web_data.get('color') is None or web_data.get('bw') is None:
-             logging.warning(f"[{ip_address}] Connected, but no counter elements found on the page.")
-             return None
-        
+            logging.warning(f"[{ip_address}] Connected, but no counter elements found on the page.")
+            return None
+
         logging.info(f"[{ip_address}] Web scraping completed successfully.")
         return web_data
 
@@ -685,6 +676,7 @@ def get_web_data_with_selenium(driver, ip_address):
         return None
 
 # --- MAIN TASK FUNCTIONS ---
+
 
 def scrape_all_with_selenium(ips, config, max_workers=None):
     """Web-scrape multiple printers in parallel (one Chromium driver per thread).
@@ -711,18 +703,52 @@ def scrape_all_with_selenium(ips, config, max_workers=None):
     return results
 
 
+def collect_toner_alerts(ip, base_info, toners, exclude_keywords,
+                              threshold_low, threshold_critical, alert_cooldown_days):
+    """Triage toner readings into DB entries and low/critical alerts (with cooldown)."""
+    db_entries = []
+    low_alerts = []
+    critical_alerts = []
+    for toner in toners:
+        db_entries.append({'ip': ip, **base_info, **toner})
+        desc_lower = toner.get('desc', '').lower()
+        if any(keyword in desc_lower for keyword in exclude_keywords):
+            continue
+        if 'level' not in toner:
+            continue
+        alert_base = {'ip': ip, **base_info, **toner}
+        level = toner.get('level')
+        status = toner.get('status')
+        last_alert_time = get_last_alert_timestamp(ip, toner.get('desc'))
+        cooldown_active = False
+        if last_alert_time and (datetime.now() - last_alert_time) < timedelta(days=alert_cooldown_days):
+            cooldown_active = True
+        if not cooldown_active:
+            if status == 'low':
+                low_alerts.append(alert_base)
+            elif level <= threshold_critical:
+                critical_alerts.append(alert_base)
+            elif level <= threshold_low:
+                low_alerts.append(alert_base)
+        elif status == 'low' or level <= threshold_low:
+            logging.info(f"[{ip}] Alert for '{toner.get('desc')}' is in cooldown. Skipping e-mail.")
+    return db_entries, low_alerts, critical_alerts
+
+
 async def check_toner_and_counters(force_email=False, ip_to_test=None):
     """INTEGRATED function for checking toners and counters."""
-    config = load_config()
+    config = load_config(CONFIG_FILE)
     printers = [{'ip': ip_to_test}] if ip_to_test else load_printers()
-    if ip_to_test: logging.info(f"Testing a single printer: {ip_to_test}")
+    if ip_to_test:
+        logging.info(f"Testing a single printer: {ip_to_test}")
 
     community = config.get('MONITORING', 'snmp_community', fallback='public')
     threshold_low = config.getint('MONITORING', 'toner_threshold_low', fallback=20)
     threshold_critical = config.getint('MONITORING', 'toner_threshold_critical', fallback=5)
-    exclude_keywords = [kw.strip().lower() for kw in config.get('MONITORING', 'toner_exclude_keywords', fallback='waste').split(',')]
+    exclude_keywords = [kw.strip().lower() for kw in
+                        config.get('MONITORING', 'toner_exclude_keywords', fallback='waste').split(',')]
     alert_cooldown_days = config.getint('MONITORING', 'alert_cooldown_days', fallback=3)
-    
+
     low_toner_alerts = []
     critical_toner_alerts = []
     all_toners_data_for_db = []
@@ -741,57 +767,42 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
 
     for printer in printers:
         ip = printer['ip']
-        if not ip: continue
+        if not ip:
+            continue
         try:
             logging.info(f"--- Processing printer: {ip} ---")
             base_info = await get_printer_base_info(ip, community, timeout=snmp_timeout,
                                                     retries=snmp_retries, port=snmp_port)
-            
+
             # --- Collecting toner data ---
             custom_oids = get_custom_oids_for_ip(config, ip)
             toners = await get_toner_levels_snmp(ip, community, config, custom_oids)
-            
+
             if not toners:
                 logging.warning(f"No toner data from {ip}.")
             else:
-                for toner in toners:
-                    toner_db_entry = {'ip': ip, **base_info, **toner}
-                    all_toners_data_for_db.append(toner_db_entry)
+                entries, low, critical = collect_toner_alerts(
+                    ip, base_info, toners, exclude_keywords,
+                    threshold_low, threshold_critical, alert_cooldown_days)
+                all_toners_data_for_db.extend(entries)
+                low_toner_alerts.extend(low)
+                critical_toner_alerts.extend(critical)
 
-                    desc_lower = toner.get('desc', '').lower()
-                    if any(keyword in desc_lower for keyword in exclude_keywords):
-                        continue
-                    if 'level' not in toner: continue
-
-                    alert_base = {'ip': ip, **base_info, **toner}
-                    level = toner.get('level')
-                    status = toner.get('status')
-                    
-                    last_alert_time = get_last_alert_timestamp(ip, toner.get('desc'))
-                    cooldown_active = False
-                    if last_alert_time and (datetime.now() - last_alert_time) < timedelta(days=alert_cooldown_days):
-                        cooldown_active = True
-
-                    if not cooldown_active:
-                        if status == 'low': low_toner_alerts.append(alert_base)
-                        elif level <= threshold_critical: critical_toner_alerts.append(alert_base)
-                        elif level <= threshold_low: low_toner_alerts.append(alert_base)
-                    elif status == 'low' or level <= threshold_low:
-                        logging.info(f"[{ip}] Alert for '{toner.get('desc')}' is in cooldown. Skipping e-mail.")
-            
             # --- Collecting counter data ---
             logging.info(f"[{ip}] Starting counter read...")
             counter_data_row = {'ip': ip, **base_info}
             web_data = web_data_map.get(ip)
-            
+
             if web_data and web_data != 'offline':
-                if not web_data.get('name'): web_data['name'] = base_info.get('name')
-                if not web_data.get('location'): web_data['location'] = base_info.get('location')
+                if not web_data.get('name'):
+                    web_data['name'] = base_info.get('name')
+                if not web_data.get('location'):
+                    web_data['location'] = base_info.get('location')
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'),
-                                                        custom_oids, timeout=snmp_timeout,
+                snmp_counters = await get_counters_snmp(ip, community, custom_oids,
+                                                         timeout=snmp_timeout,
                                                         retries=snmp_retries, port=snmp_port)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
@@ -804,8 +815,10 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
             logging.error(f"[{ip}] Unexpected error while processing printer: {e}", exc_info=True)
             continue
 
-    if all_toners_data_for_db: update_toner_status_in_db(all_toners_data_for_db)
-    if all_counters_data: save_counter_history(all_counters_data)
+    if all_toners_data_for_db:
+        update_toner_status_in_db(all_toners_data_for_db)
+    if all_counters_data:
+        save_counter_history(all_counters_data)
 
     today = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -817,7 +830,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
             sent = send_email_notification(subject, html_body, config, 'recipient_email_toner_critical', priority='high')
             if sent:
                 update_alert_timestamp(critical_toner_alerts)
-    
+
     if low_toner_alerts:
         subject = f"[WARNING] Low toner level ({len(low_toner_alerts)} alerts)"
         html_body = create_html_report(low_toner_alerts, today, "Toner", "low")
@@ -829,8 +842,9 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
 
     if not critical_toner_alerts and not low_toner_alerts:
         logging.info("No new toner alerts requiring notification detected.")
-    
+
     log_script_run('toner_check')
+
 
 async def report_counters(force_email=False, ip_to_test=None):
     """
@@ -838,7 +852,7 @@ async def report_counters(force_email=False, ip_to_test=None):
     and optionally sends them by e-mail. If a printer does not respond,
     the last known state from the database is used.
     """
-    config = load_config()
+    config = load_config(CONFIG_FILE)
     # Use the new function to load printers for the report
     printers = [{'ip': ip_to_test}] if ip_to_test else load_printers_for_counters()
     if not printers:
@@ -860,25 +874,28 @@ async def report_counters(force_email=False, ip_to_test=None):
 
     for printer in printers:
         ip = printer['ip']
-        if not ip: continue
+        if not ip:
+            continue
         try:
             logging.info(f"--- Processing counters for: {ip} ---")
             base_info = await get_printer_base_info(ip, community, timeout=snmp_timeout,
                                                     retries=snmp_retries, port=snmp_port)
             counter_data_row = {'ip': ip, **base_info}
-            
+
             # Attempt a live read
             custom_oids = get_custom_oids_for_ip(config, ip)
             web_data = web_data_map.get(ip)
-            
+
             if web_data and web_data != 'offline':
-                if not web_data.get('name'): web_data['name'] = base_info.get('name')
-                if not web_data.get('location'): web_data['location'] = base_info.get('location')
+                if not web_data.get('name'):
+                    web_data['name'] = base_info.get('name')
+                if not web_data.get('location'):
+                    web_data['location'] = base_info.get('location')
                 counter_data_row.update(web_data)
                 counter_data_row['sum'] = counter_data_row.get('color', 0) + counter_data_row.get('bw', 0)
             else:
-                snmp_counters = await get_counters_snmp(ip, community, base_info.get('model'),
-                                                        custom_oids, timeout=snmp_timeout,
+                snmp_counters = await get_counters_snmp(ip, community, custom_oids,
+                                                         timeout=snmp_timeout,
                                                         retries=snmp_retries, port=snmp_port)
                 if snmp_counters:
                     counter_data_row.update(snmp_counters)
@@ -901,7 +918,9 @@ async def report_counters(force_email=False, ip_to_test=None):
                         logging.info(f"[{ip}] Historical data found from {last_date}.")
                     else:
                         if web_data == 'offline':
-                            counter_data_row.update({'name': 'PRINTER OFFLINE', 'status': 'OFFLINE', 'comment': 'No data in database'})
+                            counter_data_row.update({
+                                'name': 'PRINTER OFFLINE', 'status': 'OFFLINE',
+                                'comment': 'No data in database'})
                         else:
                             counter_data_row.update({'name': 'READ ERROR', 'status': 'ERROR', 'comment': 'No data in database'})
 
@@ -911,17 +930,17 @@ async def report_counters(force_email=False, ip_to_test=None):
             continue
 
     if all_counters_data:
-        # Zapisz tylko aktualne dane do historii
+        # Save only current data to history
         current_data_to_save = [d for d in all_counters_data if d.get('status') == 'OK']
         if current_data_to_save:
             save_counter_history(current_data_to_save)
-        
+
         logging.info(f"Collected data for {len(all_counters_data)} counters (including historical).")
 
         if force_email:
             logging.info("Forced sending the counter report by e-mail.")
             today_str = datetime.now().strftime("%Y-%m-%d")
-            
+
             html_body = create_html_report(all_counters_data, today_str, report_type="Counters")
             excel_filename = f"Counter_Report_{today_str}.xlsx"
             excel_filepath = os.path.join(BASE_DIR, excel_filename)
@@ -935,16 +954,18 @@ async def report_counters(force_email=False, ip_to_test=None):
 
             if attachment_path and os.path.exists(attachment_path):
                  os.remove(attachment_path)
-                 logging.info(f"Usunieto tymczasowy plik raportu: {attachment_path}")
+                 logging.info(f"Removed temporary report file: {attachment_path}")
         else:
             logging.info("Counter data collected. Use --force-counters-email to send the report.")
     else:
         logging.warning("Failed to collect any counter data.")
-        
+
     log_script_run('counters_report')
 
+
 def create_excel_report(report_data, filename):
-    if not PANDAS_AVAILABLE: return None
+    if not PANDAS_AVAILABLE:
+        return None
     df_data = []
     # Filtering removed - now all data goes into the report
     for d in report_data:
@@ -956,7 +977,7 @@ def create_excel_report(report_data, filename):
             'Color counter': d.get('color'),
             'B&W counter': d.get('bw'),
             'Total': d.get('sum'),
-            'Notes': d.get('comment', '') # New column for notes
+            'Notes': d.get('comment', '')  # New column for notes
         })
     df = pd.DataFrame(df_data)
     # Define the column order
@@ -965,6 +986,7 @@ def create_excel_report(report_data, filename):
     logging.info(f"Excel report saved to: {filename}")
     return filename
 
+
 def _esc(value):
     """HTML escaping for device-provided data (W6)."""
     return html.escape(str(value if value is not None else ''))
@@ -972,13 +994,13 @@ def _esc(value):
 
 def create_html_report(report_data, today_str, report_type="Toner", alert_level="low"):
     is_toner_report = report_type == "Toner"
-    
+
     # ... (start of the function unchanged)
     if is_toner_report:
         if alert_level == 'critical':
             title = "URGENT: Critical toner level"
             message = "<p style='text-align:center; font-size:14px;'>The following consumables require <b>immediate replacement</b>!</p>"
-        else: # low
+        else:  # low
             title = "WARNING: Low toner level"
             message = "<p style='text-align:center; font-size:14px;'>Please check the stock levels and order the listed consumables.</p>"
     else:
@@ -1004,13 +1026,14 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
         }}
         h2{{text-align:center}}
     </style></head><body>
-    <h2>{title} na dzien {today_str}</h2>
+    <h2>{title} for {today_str}</h2>
     {message}
     <table><tr>
     """
-    
+
     headers = ['IP', 'Location', 'Name', 'Model', 'Toner name', 'Level %'] if is_toner_report else ['IP', 'Location', 'Name', 'Model', 'Color', 'B&W', 'Total', 'Notes']
-    for header in headers: html += f"<th>{header}</th>"
+    for header in headers:
+        html += f"<th>{header}</th>"
     html += "</tr>"
     total_color, total_bw, total_sum = 0, 0, 0
 
@@ -1019,10 +1042,13 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
             row_class = alert_level
         else:
             status = data.get('status', '')
-            if status == 'HISTORY': row_class = 'history'
-            elif status in ['OFFLINE', 'ERROR']: row_class = 'offline-error'
-            else: row_class = ''
-            
+            if status == 'HISTORY':
+                row_class = 'history'
+            elif status in ['OFFLINE', 'ERROR']:
+                row_class = 'offline-error'
+            else:
+                row_class = ''
+
         html += f"<tr class='{row_class}'>"
 
         if is_toner_report:
@@ -1046,9 +1072,12 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
                          f"<td>{_esc(data.get('bw', 'N/A'))}</td>"
                          f"<td>{_esc(data.get('sum', 'N/A'))}</td>"
                          f"<td>{_esc(data.get('comment', ''))}</td>")
-                if isinstance(data.get('color'), int): total_color += data.get('color', 0)
-                if isinstance(data.get('bw'), int): total_bw += data.get('bw', 0)
-                if isinstance(data.get('sum'), int): total_sum += data.get('sum', 0)
+                if isinstance(data.get('color'), int):
+                    total_color += data.get('color', 0)
+                if isinstance(data.get('bw'), int):
+                    total_bw += data.get('bw', 0)
+                if isinstance(data.get('sum'), int):
+                    total_sum += data.get('sum', 0)
         html += "</tr>"
     if not is_toner_report:
         html += f"<tr class='summary'><td colspan='4' style='text-align:right;'>TOTAL:</td><td>{total_color}</td><td>{total_bw}</td><td>{total_sum}</td><td></td></tr>"
@@ -1056,18 +1085,20 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
     return html
 
 # --- Glowna logika programu ---
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Printer Monitoring.")
     parser.add_argument('--check-toner', action='store_true', help='Checks toner levels and records alerts.')
     parser.add_argument('--force-toner-email', action='store_true', help='Forces toner alert e-mails (use with --check-toner).')
-    
+
     parser.add_argument('--report-counters', action='store_true', help='Collects counter data and generates a report.')
     parser.add_argument('--force-counters-email', action='store_true', help='Sends the generated counter report by e-mail (use with --report-counters).')
 
     parser.add_argument('--ip', '-i', type=str, help='Checks only a single printer with the given IP.')
     args = parser.parse_args()
-    
-    init_db() 
+
+    init_db()
 
     if args.check_toner:
         # Run only the toner check with integrated data collection
@@ -1080,12 +1111,12 @@ async def main():
         parser.print_help()
 
 if __name__ == "__main__":
-    setup_logging()
+    setup_logging(BASE_DIR, CONFIG_FILE)
 
     if not PANDAS_AVAILABLE:
         logging.warning("WARNING: 'pandas' and 'openpyxl' are not installed. Excel reports will not work.")
 
-    if not lockfile.acquire(LOCK_FILE, max_age_seconds=3600):
+    if not lockfile.acquire(LOCK_FILE, max_age_seconds=LOCK_MAX_AGE_SECONDS):
         logging.error("Another monitoring process is running (active lock). Ending this run.")
         sys.exit(1)
 
