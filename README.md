@@ -7,6 +7,7 @@
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Tests](https://img.shields.io/badge/tests-43%20passed-green)
 ![pip-audit](https://img.shields.io/badge/pip--audit-0%20vulnerabilities-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
@@ -181,7 +182,7 @@ currently 0 known vulnerabilities).
 
 ## License
 
-License decision pending (MIT recommended) — see the project discussions.
+Released under the [MIT License](LICENSE) — free to use, modify and distribute.
 
 ---
 
