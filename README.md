@@ -320,7 +320,8 @@ Kontener roboczy `prnt-mon` (obraz-snapshot `prnt-mon:dev`, sieć `prnt-mon`):
 ```bash
 docker run -d --name prnt-mon --network prnt-mon --hostname prnt-mon \
   --cap-add NET_ADMIN --restart unless-stopped \
-  -p 127.0.0.1:5001:5001 \
+  -p 127.0.0.1:5001:5001 \        # lokalnie (auto-login)
+  -p 0.0.0.0:5002:5002 \          # VLAN (tryb tokenowy)
   -v /opt/projects/printer-monitor:/workspace \
   prnt-mon:dev \
   sh -c '[ -f /workspace/start-services.sh ] && sh /workspace/start-services.sh || sleep infinity'
@@ -338,7 +339,8 @@ docker exec -d prnt-mon sh -c 'cd /workspace && nohup python -B simulator/web_mo
 docker exec -d prnt-mon sh -c 'cd /workspace && nohup gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app > /tmp/gunicorn.log 2>&1 &'
 ```
 
-- Dashboard: `http://localhost:5001` (token z `[WWW] auth_token` w `config.ini`)
+- Dashboard lokalny: `http://localhost:5001` — **auto-login** (bez tokenu; publikacja tylko na 127.0.0.1)
+- Dashboard VLAN: `http://<IP-maszyny>:5002` — **wymaga tokenu** (`[WWW] auth_token`)
 - Testowa flota: `python simulator/rotate.py write-csv` + `rotate.py list|offline|toner|counters|reset`
 - Testy: `python -m pytest` (wymaga zainstalowanych zależności + `pytest.ini`)
 - Rollback wersji kontenera: snapshoty obrazów `prnt-mon:dev`, `prnt-mon:rollback-20260812`
@@ -357,17 +359,17 @@ jednego VLAN-u uzyskują dostęp przez IP maszyny (`192.168.1.80`).
 
 ```bash
 # 1. Docker publikuje na wszystkich interfejsach WSL:
-#    docker run ... -p 0.0.0.0:5001:5001 ...
+#    docker run ... -p 0.0.0.0:5002:5002 ...
 
 # 2. Windows — portproxy (wymaga konsoli ADMIN):
-netsh interface portproxy add v4tov4 listenport=5001 listenaddress=192.168.1.80 connectport=5001 connectaddress=127.0.0.1
+netsh interface portproxy add v4tov4 listenport=5002 listenaddress=192.168.1.80 connectport=5002 connectaddress=127.0.0.1
 
 # 3. Windows — reguła firewalla (ADMIN):
-netsh advfirewall firewall add rule name="prnt-mon-dashboard" dir=in action=allow protocol=TCP localport=5001
+netsh advfirewall firewall add rule name="prnt-mon-dashboard" dir=in action=allow protocol=TCP localport=5002
 ```
 
 Uwagi:
 - `connectaddress=127.0.0.1` omija problem zmiany IP WSL2 po restarcie (Windows loopback → WSL localhostForwarding)
 - Alternatywa bez portproxy: `networkingMode=mirrored` w `%UserProfile%\.wslconfig` (WSL dzieli interfejsy Windows) + `wsl --shutdown`
-- Dostęp admina: `http://192.168.1.80:5001` + token
+- Dostęp admina: `http://192.168.1.80:5002` + token (port 5001 jest tylko lokalny)
 - Zalecane na przyszłość: TLS przez caddy/reverse proxy oraz osobne tokeny per admin (poza obecnym zakresem audytu)
