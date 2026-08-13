@@ -2,20 +2,49 @@
 
 ## Spis treści
 
-1.  [Opis projektu](#opis-projektu)
-2.  [Główne funkcjonalności](#główne-funkcjonalności)
-3.  [Struktura projektu](#struktura-projektu)
-4.  [Instalacja i wdrożenie](#instalacja-i-wdrożenie)
-    *   [Wymagania wstępne](#wymagania-wstępne)
-    *   [Kroki instalacji](#kroki-instalacji)
-5.  [Konfiguracja](#konfiguracja)
-    *   [Plik `config.ini`](#plik-configini)
-    *   [Pliki z listą drukarek](#pliki-z-listą-drukarek)
-6.  [Użytkowanie](#użytkowanie)
-    *   [Uruchamianie z linii poleceń](#uruchamianie-z-linii-poleceń)
-    *   [Dashboard webowy](#dashboard-webowy)
-    *   [Automatyzacja (Cron)](#automatyzacja-cron)
-7.  [Informacje dodatkowe](#informacje-dodatkowe)
+1.  [Szybki start](#szybki-start)
+2.  [Opis projektu](#opis-projektu)
+3.  [Główne funkcjonalności](#główne-funkcjonalności)
+4.  [Struktura projektu](#struktura-projektu)
+5.  [Instalacja i wdrożenie](#instalacja-i-wdrożenie)
+6.  [Konfiguracja](#konfiguracja)
+7.  [Użytkowanie](#użytkowanie)
+8.  [Testowanie bez drukarek (symulator)](#testowanie-bez-drukarek-symulator)
+9.  [Informacje dodatkowe](#informacje-dodatkowe)
+
+---
+
+## Szybki start
+
+Wymagania: **Python 3.9+** (zalecane 3.12), Chrome/Chromium (dla web scrapingu liczników).
+
+```bash
+git clone https://github.com/lukasz-kurenda/printer-monitor.git
+cd printer-monitor
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# konfiguracja
+cp config.ini.example config.ini        # wypelnij SMTP / odbiorcow
+python encrypt_util.py --generate-key   # klucz szyfrowania hasla SMTP
+python encrypt_util.py --encrypt        # zaszyfruj haslo -> wklej do config.ini [SMTP] password
+
+# lista drukarek (po jednym IP na linie)
+nano printers.csv
+
+# pierwsze uruchomienie (utworzy printers.db)
+python main.py --check-toner
+
+# dashboard
+python dashboard.py                     # lokalnie: http://localhost:5001
+# lub produkcja:  gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app
+```
+
+Nie masz drukarek pod ręką? Użyj wbudowanego symulatora 12 urządzeń —
+zobacz [Testowanie bez drukarek](#testowanie-bez-drukarek-symulator).
+
+Uruchom testy: `python -m pytest`
 
 ---
 
@@ -64,7 +93,7 @@ Projekt został zaprojektowany z myślą o elastyczności i łatwej rozbudowie.
 
 ### Wymagania wstępne
 
-*   Python 3.8+
+*   Python 3.9+ (zalecane 3.12 — patrz wymagania zależności: selenium >= 4.20)
 *   Przeglądarka Google Chrome lub Chromium (wymagana przez Selenium)
 *   Dostęp sieciowy do monitorowanych drukarek (port 161 dla SNMP, port 80/443 dla web scrapingu)
 
@@ -259,6 +288,24 @@ Aby w pełni zautomatyzować monitorowanie, można dodać odpowiednie wpisy do `
     5 2 1 * * /sciezka/do/srodowiska/venv/bin/python /sciezka/do/projektu/main.py --report-counters --force-counters-email >> /sciezka/do/projektu/cron.log 2>&1
     ```
     Pamiętaj, aby podać **pełne, bezwzględne ścieżki** do interpretera Python w środowisku wirtualnym oraz do skryptu `main.py`.
+
+
+## Testowanie bez drukarek (symulator)
+
+W repozytorium znajduje sie symulator floty **12 fikcyjnych drukarek**
+(SNMP agent + web mock), dzieki ktoremu mozna przetestowac caly system bez
+zadnego sprzetu: tonery, alerty, liczniki, dashboard.
+
+```bash
+python simulator/rotate.py write-csv   # wypelnij printers.csv adresami symulowanych drukarek
+python simulator/snmp_agent.py &       # agent SNMP (wymaga uprawnien do bindowania IP, patrz simulator/README.md)
+python simulator/web_mock.py &         # strony HTTP dla web scrapingu
+python main.py --check-toner           # normalna weryfikacja na symulatorze
+python simulator/rotate.py list        # stany drukarek
+python simulator/rotate.py toner 172.21.0.15 "Toner Black" --level 3   # rotacja stanu
+```
+
+Szczegóły: `simulator/README.md`.
 
 ## Informacje dodatkowe
 

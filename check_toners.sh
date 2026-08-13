@@ -1,4 +1,15 @@
 #!/bin/bash
-echo "$(date): Skrypt check_toners.sh uruchomiony przez cron" >> /home/admin/logs/printer-monitor.log
-cd /home/admin/printer-monitor
-/home/admin/printer-monitor/venv/bin/python3 main.py --check-toner --force-toner-email >> /home/admin/printer-monitor/cron.log 2>&1
+# Cron: sprawdzanie tonerow + alerty e-mail.
+# Sciezki wzgledne - dziala niezaleznie od katalogu wywolania.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG_DIR="${SCRIPT_DIR}/logs"
+mkdir -p "$LOG_DIR"
+
+PYTHON="${SCRIPT_DIR}/venv/bin/python3"
+if [ ! -x "$PYTHON" ]; then
+    PYTHON="python3"
+fi
+
+echo "$(date): check_toners.sh uruchomiony przez cron" >> "${LOG_DIR}/printer-monitor.log"
+cd "$SCRIPT_DIR"
+"$PYTHON" main.py --check-toner --force-toner-email >> "${LOG_DIR}/cron.log" 2>&1

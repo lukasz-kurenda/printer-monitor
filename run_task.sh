@@ -1,6 +1,14 @@
 #!/bin/bash
-# Przejdz do katalogu, w ktorym znajduje sie skrypt
-cd "$(dirname "$0")"
+# Uruchamia main.py z przekazanymi argumentami (np. --check-toner --force-toner-email).
+# Sciezki wzgledne - dziala niezaleznie od katalogu wywolania.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG_DIR="${SCRIPT_DIR}/logs"
+mkdir -p "$LOG_DIR"
 
-# Uruchom skrypt Pythona z odpowiednia flaga i zapisz logi
-/home/admin/printer-monitor/venv/bin/python3 main.py $1 >> /home/admin/printer-monitor/cron.log 2>&1
+PYTHON="${SCRIPT_DIR}/venv/bin/python3"
+if [ ! -x "$PYTHON" ]; then
+    PYTHON="python3"
+fi
+
+cd "$SCRIPT_DIR"
+"$PYTHON" main.py "$@" >> "${LOG_DIR}/cron.log" 2>&1
