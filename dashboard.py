@@ -54,6 +54,11 @@ setup_logging()
 # --- Autoryzacja (SEC-K3) ---
 # Token pobierany z env DASH_AUTH_TOKEN lub [WWW] auth_token w config.ini.
 # Bez skonfigurowanego tokenu dashboard zwraca 503 (fail-closed).
+#
+# Tryb AUTO_LOGIN ([WWW] auto_login = true / env DASH_AUTO_LOGIN=true):
+# autoryzacja odbywa sie automatycznie (bez podawania tokenu) - dopuszczalne
+# TYLKO gdy dashboard jest dostepny lokalnie (docker -p 127.0.0.1:5001:5001).
+# CSRF na POST pozostaje aktywny w obu trybach.
 
 def load_auth_token():
     token = os.environ.get('DASH_AUTH_TOKEN')
@@ -69,7 +74,22 @@ def load_auth_token():
     return ''
 
 
+def load_auto_login():
+    env = os.environ.get('DASH_AUTO_LOGIN', '')
+    if env:
+        return env.strip().lower() in ('1', 'true', 'yes', 'on')
+    parser = configparser.ConfigParser()
+    try:
+        parser.read(CONFIG_FILE, encoding='utf-8')
+        if parser.has_option('WWW', 'auto_login'):
+            return parser.getboolean('WWW', 'auto_login')
+    except Exception:
+        pass
+    return False
+
+
 AUTH_TOKEN = load_auth_token()
+AUTO_LOGIN = load_auto_login()
 app.secret_key = AUTH_TOKEN or 'prnt-mon-session-signing-fallback'
 app.permanent_session_lifetime = timedelta(days=30)
 
@@ -77,13 +97,19 @@ app.permanent_session_lifetime = timedelta(days=30)
 @app.before_request
 def require_auth_and_csrf():
     session.permanent = True  # sesja cookie 30 dni - token podawany rzadko
-    if not AUTH_TOKEN:
+    if AUTO_LOGIN:
+        if not session.get('authenticated'):
+            session['authenticated'] = True
+            session['csrf_token'] = secrets.token_hex(16)
+    elif not AUTH_TOKEN:
         return ("Blad: brak tokenu autoryzacji. Ustaw DASH_AUTH_TOKEN (env) "
                 "lub auth_token w sekcji [WWW] config.ini.", 503)
+    elif not session.get('authenticated'):
+        if request.endpoint in ('login', 'static'):
+            return None
+        return redirect(url_for('login'))
     if request.endpoint in ('login', 'static'):
         return None
-    if not session.get('authenticated'):
-        return redirect(url_for('login'))
     if request.method == 'POST':
         csrf = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
         if not csrf or csrf != session.get('csrf_token'):

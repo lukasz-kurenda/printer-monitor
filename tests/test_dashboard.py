@@ -87,6 +87,19 @@ def test_session_is_permanent_after_login(client):
         assert sess.permanent is True
 
 
+def test_auto_login_no_token_required(client, monkeypatch):
+    monkeypatch.setattr(dashboard, 'AUTO_LOGIN', True)
+    rv = client.get('/')
+    assert rv.status_code == 200
+    assert '172.21.0.11' in rv.get_data(as_text=True)
+
+
+def test_auto_login_csrf_still_enforced(client, monkeypatch):
+    monkeypatch.setattr(dashboard, 'AUTO_LOGIN', True)
+    rv = client.post('/run-check-toner')
+    assert rv.status_code == 403
+
+
 def test_post_without_csrf_blocked(client):
     _auth(client)
     rv = client.post('/run-check-toner')

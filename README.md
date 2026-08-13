@@ -211,6 +211,11 @@ lub w zmiennej środowiskowej `DASH_AUTH_TOKEN` (env ma pierwszeństwo):
 python -c "import secrets; print(secrets.token_urlsafe(24))"   # wygeneruj token
 ```
 
+**Tryb bez tokenu (auto-login):** `[WWW] auto_login = true` (lub env `DASH_AUTO_LOGIN=true`)
+— autoryzacja odbywa się automatycznie, token nie jest wymagany. Dozwolone **tylko**
+przy dostępie lokalnym (publikacja `-p 127.0.0.1:5001:5001`); CSRF na POST pozostaje
+aktywny w obu trybach. Przy trybie tokenowym sesja trwa 30 dni (token raz na 30 dni).
+
 Uruchomienie produkcyjne (gunicorn + Docker, dostęp przez `http://localhost:5001`):
 
 ```bash
