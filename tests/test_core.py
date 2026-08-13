@@ -50,6 +50,13 @@ def test_load_printers_skips_blank_rows(tmp_path, monkeypatch):
     assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
 
 
+def test_load_printers_skips_comment_lines(tmp_path, monkeypatch):
+    pfile = tmp_path / "printers.csv"
+    pfile.write_text("# TEST DATA - simulated fleet\n192.0.2.1\n# another comment\n192.0.2.2\n")
+    monkeypatch.setattr(main, "PRINTERS_FILE", str(pfile))
+    assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
+
+
 def test_load_printers_skips_invalid_ip(tmp_path, monkeypatch):
     pfile = tmp_path / "printers.csv"
     pfile.write_text("192.0.2.1\nnot-an-ip\n10.0.0.999\n192.0.2.2\n")

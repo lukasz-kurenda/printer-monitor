@@ -377,5 +377,6 @@
         "bw": 6800
       }
     }
-  ]
+  ],
+  "purpose": "TEST DATA - simulated printers for verification only (not real devices)"
 }

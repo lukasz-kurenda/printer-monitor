@@ -149,7 +149,7 @@ def load_printers_from_csv():
         with open(PRINTERS_FILE, mode='r', encoding='utf-8') as infile:
             reader = csv.reader(infile)
             for row in reader:
-                if row and row[0].strip():
+                if row and row[0].strip() and not row[0].strip().startswith('#'):
                     printers.append(row[0].strip())
     except Exception as e:
         logging.error(f"Failed to read file {PRINTERS_FILE}: {e}")

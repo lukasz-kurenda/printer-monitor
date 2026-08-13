@@ -242,8 +242,9 @@ token (`X-CSRF-Token` header) are rejected (HTTP 403).
 ### Automation (Cron)
 
 ```cron
-# Toners every 8 hours (00:05, 08:05, 16:05) with alerts
-5 0,8,16 * * * /path/to/venv/bin/python /path/to/project/main.py --check-toner --force-toner-email >> /path/to/project/logs/cron.log 2>&1
+# Toners every 2 hours (00:05, 02:05, ... 22:05) with alerts - schedule editable
+# in check_toners.sh header (=== SCHEDULE - EDIT HERE ===)
+5 */2 * * * /path/to/venv/bin/python /path/to/project/main.py --check-toner --force-toner-email >> /path/to/project/logs/cron.log 2>&1
 
 # Counter report on the 1st of each month at 02:05
 5 2 1 * * /path/to/venv/bin/python /path/to/project/main.py --report-counters --force-counters-email >> /path/to/project/logs/cron.log 2>&1

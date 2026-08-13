@@ -273,6 +273,8 @@ def load_printers():
             for row in reader:
                 if row and row[0].strip():
                     candidate = row[0].strip()
+                    if candidate.startswith('#'):
+                        continue  # comment / test-data marker
                     try:
                         ipaddress.ip_address(candidate)
                     except ValueError:
@@ -292,6 +294,8 @@ def load_printers_for_counters():
             for row in reader:
                 if row and row[0].strip():
                     candidate = row[0].strip()
+                    if candidate.startswith('#'):
+                        continue  # comment / test-data marker
                     try:
                         ipaddress.ip_address(candidate)
                     except ValueError:

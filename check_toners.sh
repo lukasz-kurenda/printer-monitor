@@ -1,6 +1,12 @@
 #!/bin/bash
 # Cron: toner check + e-mail alerts.
 # Relative paths - works regardless of the invocation directory.
+#
+# === SCHEDULE - EDIT HERE (default: every 2 hours) ===
+# crontab -e   (host):
+#   5 */2 * * * /path/to/check_toners.sh
+# (i.e. 00:05, 02:05, 04:05, ... 22:05; dashboard page states the same interval)
+# =======================================================
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 mkdir -p "$LOG_DIR"
