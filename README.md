@@ -255,3 +255,31 @@ Aby w pełni zautomatyzować monitorowanie, można dodać odpowiednie wpisy do `
 ## Informacje dodatkowe
 
 *   **Autor**: Łukasz Kurenda
+
+## Środowisko deweloperskie (lokalne)
+
+Repo na hoście: `/opt/projects/printer-monitor` (= `\\wsl.localhost\Ubuntu\opt\projects\printer-monitor`).
+
+Kontener roboczy `prnt-mon` (obraz-snapshot `prnt-mon:dev`, sieć `prnt-mon`):
+
+```bash
+docker run -d --name prnt-mon --network prnt-mon --hostname prnt-mon \
+  --cap-add NET_ADMIN --restart unless-stopped \
+  -p 127.0.0.1:5001:5001 \
+  -v /opt/projects/printer-monitor:/workspace \
+  prnt-mon:dev \
+  sh -c '[ -f /workspace/simulator/ip-aliases.sh ] && sh /workspace/simulator/ip-aliases.sh; sleep infinity'
+```
+
+Po starcie kontenera podnieś usługi:
+
+```bash
+docker exec -d prnt-mon sh -c 'cd /workspace && nohup python -B simulator/snmp_agent.py > /tmp/snmp.log 2>&1 &'
+docker exec -d prnt-mon sh -c 'cd /workspace && nohup python -B simulator/web_mock.py > /tmp/web.log 2>&1 &'
+docker exec -d prnt-mon sh -c 'cd /workspace && nohup gunicorn -w 1 --bind 0.0.0.0:5001 dashboard:app > /tmp/gunicorn.log 2>&1 &'
+```
+
+- Dashboard: `http://localhost:5001` (token z `[WWW] auth_token` w `config.ini`)
+- Testowa flota: `python simulator/rotate.py write-csv` + `rotate.py list|offline|toner|counters|reset`
+- Testy: `python -m pytest` (wymaga zainstalowanych zależności + `pytest.ini`)
+- Rollback wersji kontenera: snapshoty obrazów `prnt-mon:dev`, `prnt-mon:rollback-20260812`
