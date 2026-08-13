@@ -23,7 +23,7 @@
 - **SEC-K3**: dashboard with authentication - token login (`DASH_AUTH_TOKEN`/`[WWW] auth_token`),
   signed session cookie (HttpOnly, SameSite=Strict), CSRF on POST (403), fail-closed (503),
   `debug=False`, gunicorn, local bind (`docker -p 127.0.0.1:5001:5001`)
-- Audit: gitleaks 0 / bandit 0 / pip-audit 0 (report: `reports/security/audit_20260812.md`)
+- Audit: gitleaks 0 / bandit 0 / pip-audit 0 (audit report 2026-08-12 archived in the pipeline log; current dependency audit: `reports/pip_audit.json`)
 
 ### Fixes (FIX)
 - **FIX-K2**: merged duplicated `get_counters_snmp` (custom OIDs + fallback total);

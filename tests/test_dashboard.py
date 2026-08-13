@@ -100,6 +100,21 @@ def test_auto_login_csrf_still_enforced(client, monkeypatch):
     assert rv.status_code == 403
 
 
+def test_stale_session_healed_with_csrf(client):
+    """Old sessions without a csrf_token get one automatically (fix: Invalid CSRF)."""
+    with client.session_transaction() as sess:
+        sess['authenticated'] = True
+        sess.pop('csrf_token', None)
+    rv = client.get('/')
+    assert rv.status_code == 200
+    with client.session_transaction() as sess:
+        csrf = sess.get('csrf_token')
+    assert csrf
+    rv = client.post('/run-check-toner', headers={'X-CSRF-Token': csrf})
+    assert rv.status_code == 200
+    assert rv.get_json()['status'] == 'success'
+
+
 def test_post_without_csrf_blocked(client):
     _auth(client)
     rv = client.post('/run-check-toner')

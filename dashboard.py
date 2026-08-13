@@ -74,10 +74,11 @@ app.permanent_session_lifetime = timedelta(days=30)
 @app.before_request
 def require_auth_and_csrf():
     session.permanent = True  # 30-day cookie session - token rarely needed
+    if not session.get('csrf_token'):
+        session['csrf_token'] = secrets.token_hex(16)  # heal stale sessions
     if AUTO_LOGIN:
         if not session.get('authenticated'):
             session['authenticated'] = True
-            session['csrf_token'] = secrets.token_hex(16)
     elif not AUTH_TOKEN:
         return ("Error: missing auth token. Set DASH_AUTH_TOKEN (env) "
                 "or auth_token in the [WWW] section of config.ini.", 503)
