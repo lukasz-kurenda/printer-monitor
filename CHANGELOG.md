@@ -1,6 +1,20 @@
 # Changelog
 
+## [1.1.1] — 2026-08-13 — Public-readiness + UX
+
+- **Public-readiness**: skrypty cron ze ścieżkami względnymi (zamiast twardych `/home/admin/...`),
+  `SECURITY.md`, README „Szybki start" + sekcja symulatora, CI: `checkout@v5`/`setup-python@v5`/Python 3.12
+  (przywrócone do stanu zdalnego — token bez scope `workflow`)
+- **Sensitive references removed**: mentions of obsolete organisation / scan patterns removed from the entire git history
+- **Autoryzacja**: tryb `AUTO_LOGIN` (`[WWW] auto_login` / `DASH_AUTO_LOGIN`) — automatyczne logowanie
+  lokalne; sesja trwała (30 dni); rozdzielenie dashboardu: `:5001` lokalny (auto-login, tylko loopback),
+  `:5002` VLAN (tryb tokenowy)
+- **Ops**: `start-services.sh` jako entrypoint kontenera — pełny auto-start usług po restarcie
+  serwera (aliasy IP, flota, SNMP agent, web mock, gunicorn)
+- **Docs**: plan projektu przeniesiony do README (sekcja „Stan projektu"), `PLAN.md` usunięty
+
 ## [1.1.0] — 2026-08-12 — Audyt + utwardzenie (etapy /20–/55)
+
 
 ### Bezpieczeństwo (SEC)
 - **SEC-K1**: usunięcie sekretów z historii gita (`git filter-repo`); aktywny `.gitignore`; `config.ini.example`; skan blobów = 0 trafień; force-push `0955c59`

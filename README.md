@@ -307,6 +307,26 @@ python simulator/rotate.py toner 172.21.0.15 "Toner Black" --level 3   # rotacja
 
 Szczegóły: `simulator/README.md`.
 
+## Stan projektu (roadmap)
+
+**Zakres zrealizowany (v1.1.x) — audyt + utwardzenie, bez rozbudowy:**
+- FIX: zduplikowana `get_counters_snmp` scalona (custom OID-y + fallback), izolacja błędów per-drukarka
+- SEC: historia gita oczyszczona z sekretów, dashboard z auth (token/CSRF/fail-closed), tryb auto-login
+- OPS: blokada uruchomień (PID + stale-lock), `html.escape` w raportach, walidacja IP, timeouty SNMP z configu,
+  znacznik alertu tylko po udanej wysyłce, web scraping równoległy, rotacja logów, auto-start usług
+- TEST: symulator 12 fikcyjnych drukarek (SNMP + HTTP + rotacja stanów), 41 testów, CI zielone
+
+**Decyzje projektowe:**
+- Protokół docelowy odczytu liczników: **SNMP** (web scraping pozostaje jako fallback)
+- Dashboard: lokalnie `:5001` auto-login; dla administratorów w VLAN `:5002` tryb tokenowy
+- Symulator = narzędzie testowe (nie feature produktu)
+
+**Planowane (poza obecnym zakresem):** wykresy historii liczników na dashboardzie, lista offline,
+kreator `config.ini`, IPv6, wiele community SNMP, webhooki powiadomień, TLS przez reverse proxy,
+osobne tokeny per administrator.
+
+Szczegóły zmian: [CHANGELOG.md](CHANGELOG.md) · Bezpieczeństwo: [SECURITY.md](SECURITY.md)
+
 ## Informacje dodatkowe
 
 *   **Autor**: Łukasz Kurenda
