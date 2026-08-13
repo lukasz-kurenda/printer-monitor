@@ -29,6 +29,6 @@
 - memory-ui in HIVE: disabled permanently (requirements removed)
 
 ## [CONTEXT]
-- Project: private repo lukasz-kurenda/printer-monitor; prnt-mon container (network prnt-mon, NET_ADMIN, /workspace volume, snapshot image prnt-mon:dev, -p 127.0.0.1:5001:5001)
+- Project: repo lukasz-kurenda/printer-monitor; prnt-mon container (network prnt-mon, NET_ADMIN, /workspace volume, snapshot image prnt-mon:dev, -p 127.0.0.1:5001:5001)
 - Test environment: simulator (12 fake IPs 172.21.0.11-22)
 - Accepted technical debt: legacy flake8 style (exit-zero in CI) in main.py/dashboard.py

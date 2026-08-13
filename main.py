@@ -1035,7 +1035,7 @@ def create_html_report(report_data, today_str, report_type="Toner", alert_level=
         else:
             if data.get('status') in ['OFFLINE', 'ERROR']:
                 html += (f"<td class='offline-error' colspan='{len(headers)}'>"
-                         f"Drukarka {_esc(data.get('ip'))} - {_esc(data.get('name'))} "
+                         f"Printer {_esc(data.get('ip'))} - {_esc(data.get('name'))} "
                          f"({_esc(data.get('comment', ''))})</td>")
             else:
                 html += (f"<td>{_esc(data.get('ip', ''))}</td>"
