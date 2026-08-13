@@ -193,6 +193,8 @@ def index():
 
     filter_keywords = [kw.strip().lower() for kw in config.get('MONITORING', 'toner_filter_keywords', fallback='').split(',')]
     exclude_keywords = [kw.strip().lower() for kw in config.get('MONITORING', 'toner_exclude_keywords', fallback='').split(',')]
+    filter_keywords = [k for k in filter_keywords if k]
+    exclude_keywords = [k for k in exclude_keywords if k]
 
     if conn:
         try:
@@ -204,10 +206,10 @@ def index():
             last_run_result = last_run_cursor.fetchone()
             if last_run_result:
                 last_run_time = last_run_result['run_timestamp']
-
-            conn.close()
         except sqlite3.OperationalError as e:
             logging.error(f"Database query error: {e}.")
+        finally:
+            conn.close()
 
     # ... (rest of the function unchanged)
     db_printers = {}

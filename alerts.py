@@ -39,6 +39,7 @@ def collect_toner_alerts(ip, base_info, toners, exclude_keywords,
     db_entries = []
     low_alerts = []
     critical_alerts = []
+    exclude_keywords = [k for k in exclude_keywords if k]  # [''] would exclude everything
     for toner in toners:
         db_entries.append({'ip': ip, **base_info, **toner})
         desc_lower = toner.get('desc', '').lower()

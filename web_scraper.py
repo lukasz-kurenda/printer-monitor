@@ -15,6 +15,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from common import WEB_WORKERS_DEFAULT
 
 
+import re
+
+
+def _parse_counter_cell(text):
+    """Parse a counter cell, tolerating formatting (e.g. '12,345' or '--')."""
+    digits = re.sub(r'\D', '', text or '')
+    if not digits:
+        return None
+    return int(digits)
+
+
 def init_selenium_driver(config):
     """Initialize and return a Selenium Chrome driver instance."""
     try:
@@ -64,10 +75,10 @@ def get_web_data_with_selenium(driver, ip_address):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         color_cell = soup.find('td', id='TotalFullColor')
         if color_cell:
-            web_data['color'] = int(color_cell.get_text(strip=True))
+            web_data['color'] = _parse_counter_cell(color_cell.get_text(strip=True))
         bw_cell = soup.find('td', id='TotalBlackColor')
         if bw_cell:
-            web_data['bw'] = int(bw_cell.get_text(strip=True))
+            web_data['bw'] = _parse_counter_cell(bw_cell.get_text(strip=True))
         driver.switch_to.default_content()
 
         if web_data.get('color') is None or web_data.get('bw') is None:
@@ -97,14 +108,18 @@ def scrape_all_with_selenium(ips, config, max_workers=None):
     results = {}
 
     def _scrape_one(ip):
-        driver = init_selenium_driver(config)
-        if not driver:
-            logging.error(f"[{ip}] Failed to initialize the Selenium driver.")
-            return ip, None
         try:
-            return ip, get_web_data_with_selenium(driver, ip)
-        finally:
-            driver.quit()
+            driver = init_selenium_driver(config)
+            if not driver:
+                logging.error(f"[{ip}] Failed to initialize the Selenium driver.")
+                return ip, None
+            try:
+                return ip, get_web_data_with_selenium(driver, ip)
+            finally:
+                driver.quit()
+        except Exception as e:
+            logging.error(f"[{ip}] Unexpected error in web scraper worker: {e}", exc_info=True)
+            return ip, None
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for ip, result in executor.map(_scrape_one, ips):

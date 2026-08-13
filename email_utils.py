@@ -18,6 +18,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def send_email_notification(subject, html_body, config, recipient_key, attachment_path=None, priority=None):
     logging.info(f"Attempting to send e-mail notification (key: {recipient_key}, priority: {priority})")
+    if not config.has_section('SMTP') or not config.has_section('EMAILS'):
+        logging.error("SMTP/EMAILS section missing from the configuration. E-mail not sent.")
+        return False
     smtp_config = config['SMTP']
     sender_email = smtp_config.get('sender_email')
     receiver_emails_str = config['EMAILS'].get(recipient_key)

@@ -47,6 +47,7 @@ async def check_toner_and_counters(force_email=False, ip_to_test=None):
     threshold_critical = config.getint('MONITORING', 'toner_threshold_critical', fallback=5)
     exclude_keywords = [kw.strip().lower() for kw in
                         config.get('MONITORING', 'toner_exclude_keywords', fallback='waste').split(',')]
+    exclude_keywords = [k for k in exclude_keywords if k]
     alert_cooldown_days = config.getint('MONITORING', 'alert_cooldown_days', fallback=3)
 
     low_toner_alerts = []

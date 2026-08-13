@@ -331,3 +331,39 @@ def test_alert_timestamp_set_after_successful_send(monkeypatch):
     calls = _patch_check_toner(monkeypatch, send_result=True)
     asyncio.run(main.check_toner_and_counters(force_email=True))
     assert calls["timestamps"] == 1
+
+# --- Regression tests for fixed bugs ---
+
+def test_counters_fallback_zero_total_not_falsy(monkeypatch):
+    """'0' as the total counter must be a valid read, not a failure."""
+    async def fake_get(ip, oids, community, **kw):
+        return {"1.3.6.1.2.1.43.10.2.1.4.1.1": "0"}
+
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
+    result = asyncio.run(snmp_mod.get_counters_snmp("192.0.2.1", "public"))
+    assert result == {"color": 0, "bw": 0, "sum": 0, "status": "OK"}
+
+
+def test_parse_counter_cell_tolerates_formatting():
+    from web_scraper import _parse_counter_cell
+    assert _parse_counter_cell("12,345") == 12345
+    assert _parse_counter_cell(" 42 ") == 42
+    assert _parse_counter_cell("--") is None
+    assert _parse_counter_cell("") is None
+
+
+def test_empty_exclude_keywords_do_not_hide_alerts(monkeypatch):
+    toners = [{"desc": "Toner Black", "level": 3.0, "status": "normal"}]
+    entries, low, critical = main.collect_toner_alerts(
+        "192.0.2.1", {"model": "M", "name": "N", "location": "L"},
+        toners, [""], threshold_low=20, threshold_critical=5, alert_cooldown_days=3)
+    assert len(critical) == 1
+    assert len(low) == 0
+    assert len(entries) == 1
+
+
+def test_send_email_requires_config_sections():
+    import configparser
+    cfg = configparser.ConfigParser()
+    cfg.read_dict({"MONITORING": {"snmp_community": "public"}})
+    assert main.send_email_notification("s", "<p>h</p>", cfg, "recipient_email_toner_low") is False

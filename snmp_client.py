@@ -205,7 +205,7 @@ async def get_counters_snmp(ip, community, custom_oids=None,
     total_data = await get_snmp_data_async(ip, [total_oid], community,
                                            timeout=timeout, retries=retries, port=port)
     total_count = total_data.get(total_oid)
-    if total_count:
+    if total_count is not None:
         try:
             total = int(total_count)
             # Assume the total is black & white if color is not specified
