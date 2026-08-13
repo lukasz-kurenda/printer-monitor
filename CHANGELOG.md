@@ -1,53 +1,65 @@
 # Changelog
 
+All notable changes to this project are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/) and this project
+uses [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+- CI modernization (actions v5, Python 3.12) — pending the `workflow` scope on the push token.
+
 ## [1.1.1] — 2026-08-13 — Public-readiness + UX
 
-- **Public-readiness**: cron scripts use relative paths (instead of hardcoded `/home/admin/...`),
-  `SECURITY.md`, README "Quick start" + simulator section, CI: `checkout@v5`/`setup-python@v5`/Python 3.12
-  (reverted to remote state - token lacks `workflow` scope)
-- **Sensitive references removed**: mentions of obsolete organisation / scan patterns removed from the entire git history
-  (filter-repo), force-push
-- **Authentication**: `AUTO_LOGIN` mode (`[WWW] auto_login` / `DASH_AUTO_LOGIN`) - automatic
-  local login; permanent session (30 days); dashboard split: `:5001` local (auto-login,
-  loopback only), `:5002` VLAN (token mode)
-- **Ops**: `start-services.sh` as container entrypoint - full service auto-start after a
-  server restart (IP aliases, fleet, SNMP agent, web mock, gunicorn)
-- **Docs**: project plan moved to README ("Project status" section), `PLAN.md` removed,
-  whole project translated to English
+### Added
+- `SECURITY.md` with a vulnerability reporting process.
+- README "Quick start" and simulator sections; project translated to English
+  (code, UI, docs, reports).
+- `AUTO_LOGIN` mode (`[WWW] auto_login` / `DASH_AUTO_LOGIN`) for local use;
+  permanent 30-day sessions.
+- Dashboard split: `:5001` local (auto-login, loopback only), `:5002` VLAN (token mode).
+- `start-services.sh` — container entrypoint that brings every service back
+  after a server restart (IP aliases, fleet, agents, gunicorn).
+- CSRF healing for stale sessions (no more "Invalid CSRF token" after upgrades).
 
-## [1.1.0] — 2026-08-12 — Audit + hardening (pipeline /20–/55)
+### Changed
+- Cron scripts use relative paths instead of hardcoded `/home/admin/...`.
+- Dashboard title/footer: "Printers Dashboard", GitHub icon link to the repository.
+- Update interval text: every 2 hours (schedule marker in `check_toners.sh`).
+- `printers.csv` / `printers_counters.csv` generated with a `# TEST DATA` header;
+  seed data marked as test data.
 
-### Security (SEC)
-- **SEC-K1**: secrets removed from git history (`git filter-repo`); active `.gitignore`;
-  `config.ini.example`; blob scan = 0 hits; force-push `0955c59`
-- **SEC-K3**: dashboard with authentication - token login (`DASH_AUTH_TOKEN`/`[WWW] auth_token`),
-  signed session cookie (HttpOnly, SameSite=Strict), CSRF on POST (403), fail-closed (503),
-  `debug=False`, gunicorn, local bind (`docker -p 127.0.0.1:5001:5001`)
-- Audit: gitleaks 0 / bandit 0 / pip-audit 0 (audit report 2026-08-12 archived in the pipeline log; current dependency audit: `reports/pip_audit.json`)
+### Removed
+- `PLAN.md` (plan absorbed into README); dated reports (`session_digest.md`,
+  `audit_20260812.md`).
 
-### Fixes (FIX)
-- **FIX-K2**: merged duplicated `get_counters_snmp` (custom OIDs + fallback total);
-  TypeError on an offline printer no longer aborts the run
-- Per-printer error isolation (the loop no longer dies)
-- IP validation in `printers*.csv`
+### Security
+- Removed all obsolete organisation references from the git history (filter-repo + force-push).
 
-### Ops (W5/W6/W8/W10)
-- **W5**: `lockfile.py` - PID + timestamp lock with stale detection; no more parallel runs
-  (cron/dashboard), HTTP 409 on the dashboard
-- **W6**: `html.escape` in e-mail reports
-- **W8**: `snmp_timeout`/`snmp_retries`/`snmp_port` from config (instead of hardcode)
-- **W10**: alert timestamp updated only after a successful SMTP send
+## [1.1.0] — 2026-08-12 — Audit + hardening
 
-### Performance and tooling
-- Parallel web scraping (`web_workers`, separate Chromium per thread): 12 printers 65s -> 25s
-- Log rotation: `RotatingFileHandler` (1 MB x 3) in `main.py` and `dashboard.py`
-- Tests: 41 (core 24, dashboard 9, lockfile 8); green GitHub Actions CI
+### Fixed
+- Merged duplicated `get_counters_snmp` (custom OIDs + fallback) — an offline
+  printer no longer aborts the whole run (FIX-K2).
+- Per-printer error isolation; IP validation in `printers*.csv`.
 
-### Testing
-- **INTEG-SIM**: 12 fake printer fleet simulator - SNMP agent (pysnmp 7, per-IP :161)
-  + web mock (frameset, :80) + state rotation CLI (`simulator/rotate.py`); e2e verification:
-  alerts, counters, exclusions, offline, dashboard
+### Added
+- Run lock (`lockfile.py`, PID + timestamp + stale detection) — no more parallel
+  runs from cron and the dashboard at the same time.
+- `html.escape` in e-mail reports.
+- SNMP timeouts/retries/port from config (no more hardcodes).
+- Alert timestamp updated only after a successful SMTP send.
+- Parallel web scraping (`web_workers`); log rotation (1 MB x 3).
+- Test fleet simulator: 12 fake printers (SNMP + HTTP + state rotation).
+- 41+ unit tests and green GitHub Actions CI.
 
-## [1.0.0] — 2026-08-12 — State before the audit (history rewritten)
+### Security
+- Secrets purged from the git history (`git filter-repo`, force-push `0955c59`).
+- Dashboard authentication: token login, signed session cookie (HttpOnly,
+  SameSite=Strict), CSRF on POST, fail-closed without a token, `debug=False`,
+  gunicorn, loopback-only publish.
+- Audit: gitleaks 0 / bandit 0 / pip-audit 0 (current dependency audit:
+  `reports/pip_audit.json`).
 
-- Original application version (history cleaned of secrets; commits before `0955c59` unavailable)
+## [1.0.0] — 2026-08-12 — Original version
+
+- Original application (history rewritten; commits before `0955c59` are gone).
