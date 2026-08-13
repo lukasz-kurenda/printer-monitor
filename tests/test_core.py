@@ -6,6 +6,9 @@ import configparser
 import sqlite3
 
 import main
+import db as db_mod
+import printers as printers_mod
+import snmp_client as snmp_mod
 
 
 # --- Configuration ---
@@ -46,26 +49,26 @@ def test_load_config_missing_file_returns_empty(tmp_path, monkeypatch):
 def test_load_printers_skips_blank_rows(tmp_path, monkeypatch):
     pfile = tmp_path / "printers.csv"
     pfile.write_text("192.0.2.1\n\n  \n192.0.2.2\n")
-    monkeypatch.setattr(main, "PRINTERS_FILE", str(pfile))
+    monkeypatch.setattr(printers_mod, "PRINTERS_FILE", str(pfile))
     assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
 
 
 def test_load_printers_skips_comment_lines(tmp_path, monkeypatch):
     pfile = tmp_path / "printers.csv"
     pfile.write_text("# TEST DATA - simulated fleet\n192.0.2.1\n# another comment\n192.0.2.2\n")
-    monkeypatch.setattr(main, "PRINTERS_FILE", str(pfile))
+    monkeypatch.setattr(printers_mod, "PRINTERS_FILE", str(pfile))
     assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
 
 
 def test_load_printers_skips_invalid_ip(tmp_path, monkeypatch):
     pfile = tmp_path / "printers.csv"
     pfile.write_text("192.0.2.1\nnot-an-ip\n10.0.0.999\n192.0.2.2\n")
-    monkeypatch.setattr(main, "PRINTERS_FILE", str(pfile))
+    monkeypatch.setattr(printers_mod, "PRINTERS_FILE", str(pfile))
     assert main.load_printers() == [{"ip": "192.0.2.1"}, {"ip": "192.0.2.2"}]
 
 
 def test_load_printers_missing_file(tmp_path, monkeypatch):
-    monkeypatch.setattr(main, "PRINTERS_FILE", str(tmp_path / "nope.csv"))
+    monkeypatch.setattr(printers_mod, "PRINTERS_FILE", str(tmp_path / "nope.csv"))
     assert main.load_printers() == []
 
 
@@ -89,8 +92,8 @@ def test_toner_levels_percentage_mode(monkeypatch):
             out[oid] = "75" if idx == "1" else "50"
         return out
 
-    monkeypatch.setattr(main, "walk_snmp_oid", fake_walk)
-    monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
+    monkeypatch.setattr(snmp_mod, "walk_snmp_oid", fake_walk)
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
     custom = {
         "desc": "1.3.6.1.4.1.999.1",
         "max": "1.3.6.1.4.1.999.2",
@@ -114,8 +117,8 @@ def test_toner_levels_max_mode(monkeypatch):
                 out[oid] = "10000"
         return out
 
-    monkeypatch.setattr(main, "walk_snmp_oid", fake_walk)
-    monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
+    monkeypatch.setattr(snmp_mod, "walk_snmp_oid", fake_walk)
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
     toners = asyncio.run(main.get_toner_levels_snmp("192.0.2.1", "public", _monitoring_config(), None))
     assert toners[0]["level"] == 70.0
     assert toners[0]["status"] == "normal"
@@ -135,8 +138,8 @@ def test_toner_levels_special_values(monkeypatch):
                 out[oid] = {"1": "10000", "2": "-2"}[idx]
         return out
 
-    monkeypatch.setattr(main, "walk_snmp_oid", fake_walk)
-    monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
+    monkeypatch.setattr(snmp_mod, "walk_snmp_oid", fake_walk)
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
     toners = asyncio.run(main.get_toner_levels_snmp("192.0.2.1", "public", _monitoring_config(), None))
     by_desc = {t["desc"]: t for t in toners}
     assert by_desc["Toner Black"]["level"] == 5.0
@@ -151,7 +154,7 @@ def test_counters_custom_oids(monkeypatch):
     async def fake_get(ip, oids, community, **kw):
         return {oids[0]: "12", oids[1]: "34"}
 
-    monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
     custom = {"oid_color_count": "1.3.6.1.4.1.999.100", "oid_bw_count": "1.3.6.1.4.1.999.101"}
     result = asyncio.run(main.get_counters_snmp("192.0.2.1", "public", custom))
     assert result == {"color": 12, "bw": 34, "sum": 46, "status": "OK"}
@@ -161,7 +164,7 @@ def test_counters_custom_oids_both_missing(monkeypatch):
     async def fake_get(ip, oids, community, **kw):
         return {}
 
-    monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
     custom = {"oid_color_count": "1.3.6.1.4.1.999.100", "oid_bw_count": "1.3.6.1.4.1.999.101"}
     assert asyncio.run(main.get_counters_snmp("192.0.2.1", "public", custom)) is None
 
@@ -170,7 +173,7 @@ def test_counters_fallback_total(monkeypatch):
     async def fake_get(ip, oids, community, **kw):
         return {"1.3.6.1.2.1.43.10.2.1.4.1.1": "5000"}
 
-    monkeypatch.setattr(main, "get_snmp_data_async", fake_get)
+    monkeypatch.setattr(snmp_mod, "get_snmp_data_async", fake_get)
     result = asyncio.run(main.get_counters_snmp("192.0.2.1", "public"))
     assert result == {"color": 0, "bw": 5000, "sum": 5000, "status": "OK"}
 
@@ -218,7 +221,7 @@ def test_create_html_report_counters_summary():
 
 def test_alert_timestamp_roundtrip(tmp_path, monkeypatch):
     db_file = tmp_path / "printers.db"
-    monkeypatch.setattr(main, "DB_FILE", str(db_file))
+    monkeypatch.setattr(db_mod, "DB_FILE", str(db_file))
     con = sqlite3.connect(db_file)
     con.execute(
         "CREATE TABLE toner_status ("
@@ -260,7 +263,7 @@ def test_snmp_timeout_retries_port_wired(monkeypatch):
         async def create(cls, addr, timeout, retries):
             return cls(addr, timeout, retries)
 
-    monkeypatch.setattr(main, "UdpTransportTarget", FakeTarget)
+    monkeypatch.setattr(snmp_mod, "UdpTransportTarget", FakeTarget)
     asyncio.run(main.get_snmp_data_async(
         "192.0.2.1", ["1.3.6.1.2.1.1.5.0"], "public", timeout=7, retries=3, port=1161))
     assert captured["timeout"] == 7

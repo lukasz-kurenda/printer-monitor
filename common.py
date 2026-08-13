@@ -13,6 +13,7 @@ import os
 LOG_FORMAT = '%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s'
 DEFAULT_LOG_FILE = 'printer_monitor.log'
 LOCK_MAX_AGE_SECONDS = 3600
+WEB_WORKERS_DEFAULT = 3
 
 
 def load_config(config_file):
