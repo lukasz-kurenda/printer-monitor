@@ -61,6 +61,9 @@ python simulator/rotate.py reset                        # back to seed
 ## Notes
 
 - `state.json` is gitignored (local rotation data).
+- `write-csv` puts a `# TEST DATA - simulated fleet` header into printers.csv /
+  printers_counters.csv (the loaders skip `#` lines) - the tracked templates
+  stay empty.
 - IPs 172.21.0.11-22 = the docker `prnt-mon` network subnet (172.21.0.0/16).
 - After `docker restart prnt-mon`, `start-services.sh` restarts everything
   automatically (IP aliases + agents + gunicorn).
