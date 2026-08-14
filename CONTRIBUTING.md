@@ -55,5 +55,4 @@ tests/                   pytest suite
 
 ## Code of conduct
 
-Be respectful. This is a small, friendly project — keep it that way. If your
-first PR is also your first PR anywhere: welcome, we are glad you are here.
+Be respectful. This is a small, friendly project — keep it that way.
