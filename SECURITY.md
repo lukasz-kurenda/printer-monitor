@@ -13,6 +13,7 @@ a problem.
 
 ## Reporting a vulnerability
 
+Nobody is perfect — if you found a problem, thank you for telling us first.
 Please do **not** open a public issue for security problems. Report privately:
 
 - via GitHub Security Advisories:
