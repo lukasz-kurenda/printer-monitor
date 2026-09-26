@@ -1,0 +1,36 @@
+name: prnt-mon
+
+networks:
+  prnt-mon-bridge:
+    external: true
+    name: prnt-mon
+
+services:
+  monitor:
+    image: prnt-mon:dev
+    container_name: prnt-mon
+    networks:
+      - prnt-mon-bridge
+    volumes:
+      - /opt/projects/printer-monitor:/workspace
+    ports:
+      - "127.0.0.1:5001:5001"
+      - "5002:5002"
+    command: ["sh", "-c", "[ -f /workspace/start-services.sh ] && sh /workspace/start-services.sh || sleep infinity"]
+    labels:
+      homepage.enable: "true"
+      homepage.server: my-docker
+      homepage.container: prnt-mon
+      homepage.group: Projekty
+      homepage.name: Printers
+      homepage.icon: mdi-printer
+      homepage.href: https://printers.gabson.systems
+      homepage.description: Projekt A
+    mem_limit: 1g
+    cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
